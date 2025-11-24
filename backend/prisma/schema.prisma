@@ -1,0 +1,83 @@
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum RoleName {
+  STUDENT
+  TEACHER
+  ADMIN
+}
+
+enum PermissionAction {
+  VIEW_TASKS
+  CREATE_TASK
+  SUBMIT_WORK
+  REVIEW_SUBMISSION
+  MANAGE_USERS
+}
+
+model User {
+  id           Int          @id @default(autoincrement())
+  username     String       @unique
+  password     String
+  fullName     String
+  roles        Role[]
+  groupId      Int?
+  group        Group?       @relation(fields: [groupId], references: [id])
+  createdTasks Task[]       @relation("TasksCreated")
+  submissions  Submission[]
+}
+
+model Role {
+  id          Int          @id @default(autoincrement())
+  name        RoleName     @unique
+  users       User[]
+  permissions Permission[] @relation("RolePermissions")
+}
+
+model Group {
+  id       Int    @id @default(autoincrement())
+  name     String @unique
+  students User[]
+  tasks    Task[]
+}
+
+model Permission {
+  id     Int              @id @default(autoincrement())
+  action PermissionAction @unique
+  roles  Role[]           @relation("RolePermissions")
+}
+
+model Task {
+  id          Int          @id @default(autoincrement())
+  title       String
+  description String
+  createdAt   DateTime     @default(now())
+  dueDate     DateTime?
+  createdById Int
+  groupId     Int?
+  createdBy   User         @relation("TasksCreated", fields: [createdById], references: [id])
+  group       Group?       @relation(fields: [groupId], references: [id])
+  submissions Submission[]
+
+  @@unique([title, groupId])
+}
+
+model Submission {
+  id          Int      @id @default(autoincrement())
+  content     String?
+  fileUrl     String?
+  submittedAt DateTime @default(now())
+  taskId      Int
+  studentId   Int
+  task        Task     @relation(fields: [taskId], references: [id])
+  student     User     @relation(fields: [studentId], references: [id])
+
+  @@unique([taskId, studentId])
+}
