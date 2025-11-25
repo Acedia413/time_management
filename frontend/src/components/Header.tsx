@@ -1,73 +1,41 @@
 import React from "react";
 
+type UserProfile = {
+  id: number;
+  username: string;
+  fullName: string;
+  roles: string[];
+  group?: { id: number; name: string } | null;
+};
+
 interface HeaderProps {
   currentView: string;
   currentRole: string;
-  changeRole: (role: string) => void;
+  user: UserProfile | null;
 }
+
+const viewTitles: Record<string, { title: string; subtitle: string }> = {
+  dashboard: { title: "Панель управления", subtitle: "Обзор задач и активности" },
+  tasks: { title: "Задачи", subtitle: "Список задач и их статусы" },
+  users: { title: "Пользователи", subtitle: "Справочник учетных записей" },
+  journal: { title: "Журнал активности", subtitle: "История действий и проверок" },
+  settings: { title: "Настройки", subtitle: "Параметры системы" },
+};
 
 const Header: React.FC<HeaderProps> = ({
   currentView,
   currentRole,
-  changeRole,
+  user,
 }) => {
-  const getHeaderContent = () => {
-    switch (currentView) {
-      case "dashboard":
-        return {
-          title: "Дашборд",
-          subtitle: "Сводная информация по текущим процессам",
-        };
-      case "tasks":
-        return {
-          title: "Задачи",
-          subtitle: "Управление текущими заданиями и сроками",
-        };
-      case "users":
-        return {
-          title: "Пользователи",
-          subtitle: "Реестр студентов и преподавателей",
-        };
-      case "journal":
-        return {
-          title: "Журнал контроля",
-          subtitle: "Мониторинг успеваемости студентов",
-        };
-      default:
-        return { title: "Раздел в разработке...", subtitle: "" };
-    }
-  };
+  const headerContent =
+    viewTitles[currentView] ?? { title: "Раздел", subtitle: "" };
 
-  const getUserInfo = () => {
-    switch (currentRole) {
-      case "student":
-        return {
-          name: "Иван Иванов",
-          role: "Студент (ИС-41)",
-          initial: "И",
-          color: "#4F46E5",
-        };
-      case "teacher":
-        return {
-          name: "Петров П.С.",
-          role: "Научный руководитель",
-          initial: "П",
-          color: "#059669",
-        };
-      case "admin":
-        return {
-          name: "Администратор Системы",
-          role: "IT Отдел",
-          initial: "А",
-          color: "#DC2626",
-        };
-      default:
-        return { name: "User", role: "Guest", initial: "U", color: "#4F46E5" };
-    }
-  };
+  const primaryRole = currentRole
+    ? currentRole.charAt(0).toUpperCase() + currentRole.slice(1)
+    : "Guest";
 
-  const headerContent = getHeaderContent();
-  const userInfo = getUserInfo();
+  const initial =
+    (user?.fullName ?? user?.username ?? "U").charAt(0).toUpperCase();
 
   return (
     <div className="header">
@@ -76,25 +44,9 @@ const Header: React.FC<HeaderProps> = ({
         <p>{headerContent.subtitle}</p>
       </div>
       <div className="user-controls">
-        <div style={{ textAlign: "right" }}>
-          <label style={{ fontSize: "10px", color: "#999", display: "block" }}>
-            РЕЖИМ ПРОТОТИПА
-          </label>
-          <select
-            className="role-switcher"
-            id="roleSelect"
-            value={currentRole}
-            onChange={(e) => changeRole(e.target.value)}
-          >
-            <option value="student">Роль: Студент</option>
-            <option value="teacher">Роль: Преподаватель</option>
-            <option value="admin">Роль: Администратор</option>
-          </select>
-        </div>
-
         <button
           onClick={() => {
-            localStorage.removeItem("isLoggedIn");
+            localStorage.removeItem("token");
             localStorage.removeItem("userRole");
             window.location.href = "/login";
           }}
@@ -117,19 +69,19 @@ const Header: React.FC<HeaderProps> = ({
           <div
             className="avatar"
             id="userAvatar"
-            style={{ backgroundColor: userInfo.color }}
+            style={{ backgroundColor: "#4F46E5" }}
           >
-            {userInfo.initial}
+            {initial}
           </div>
           <div>
             <div style={{ fontWeight: 600 }} id="userName">
-              {userInfo.name}
+              {user?.fullName ?? user?.username ?? "Гость"}
             </div>
             <div
               style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}
               id="userRole"
             >
-              {userInfo.role}
+              {primaryRole}
             </div>
           </div>
         </div>

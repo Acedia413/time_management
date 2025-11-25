@@ -4,70 +4,55 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 export default function LoginPage() {
-  const [role, setRole] = useState<string | null>(null);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
 
+  const apiUrl =
+    process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
-  // Механика обязательноговыбора роли перед логином, под вопросом
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!role) {
-      setError("Пожалуйста, выберите роль перед входом.");
-      return;
-    }
+    setError("");
+    setIsSubmitting(true);
 
-    if (username === "User" && password === "User") {
-      localStorage.setItem("isLoggedIn", "true");
-      localStorage.setItem("userRole", role);
+    try {
+      const response = await fetch(`${apiUrl}/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      });
+
+      if (!response.ok) {
+        setError("Неверный логин или пароль");
+        setIsSubmitting(false);
+        return;
+      }
+
+      const data = await response.json();
+      const primaryRole = data.user?.roles?.[0]?.toLowerCase?.() ?? "student";
+
+      localStorage.setItem("token", data.accessToken);
+      localStorage.setItem("userRole", primaryRole);
 
       router.push("/");
-    } else {
-      setError("Неверный логин или пароль");
+    } catch {
+      setError("Ошибка при авторизации. Попробуйте позже.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   return (
     <div className="login-container">
       <div className="login-card">
-        <div className="role-selector">
-          <button
-            type="button"
-            className={`role-btn ${role === "student" ? "active" : ""}`}
-            onClick={() => {
-              setRole("student");
-              setError("");
-            }}
-          >
-            Студент
-          </button>
-          <button
-            type="button"
-            className={`role-btn ${role === "teacher" ? "active" : ""}`}
-            onClick={() => {
-              setRole("teacher");
-              setError("");
-            }}
-          >
-            Преподаватель
-          </button>
-          <button
-            type="button"
-            className={`role-btn ${role === "admin" ? "active" : ""}`}
-            onClick={() => {
-              setRole("admin");
-              setError("");
-            }}
-          >
-            Администратор
-          </button>
-        </div>
-
         <div className="login-body">
           <h2 className="login-title">Вход в систему</h2>
-          <p className="login-subtitle">Выберите роль и введите данные</p>
+          <p className="login-subtitle">
+            Укажите логин и пароль, чтобы продолжить
+          </p>
 
           <form onSubmit={handleLogin} className="login-form">
             <div className="form-group">
@@ -96,7 +81,7 @@ export default function LoginPage() {
             {error && <div className="error-message">{error}</div>}
 
             <button type="submit" className="btn btn-primary btn-block">
-              Войти
+              {isSubmitting ? "Входим..." : "Войти"}
             </button>
           </form>
         </div>

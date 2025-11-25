@@ -9,25 +9,62 @@ import Sidebar from "../components/Sidebar";
 import TaskList from "../components/TaskList";
 import UserList from "../components/UserList";
 
+type UserProfile = {
+  id: number;
+  username: string;
+  fullName: string;
+  roles: string[];
+  group?: { id: number; name: string } | null;
+};
+
 export default function Home() {
   const [currentRole, setCurrentRole] = useState("student");
   const [currentView, setCurrentView] = useState("dashboard");
   const [isLoading, setIsLoading] = useState(true);
+  const [user, setUser] = useState<UserProfile | null>(null);
   const router = useRouter();
 
-  useEffect(() => {
-    const isLoggedIn = localStorage.getItem("isLoggedIn");
-    const savedRole = localStorage.getItem("userRole");
+  const apiUrl =
+    process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
-    if (!isLoggedIn) {
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) {
       router.push("/login");
-    } else {
-      if (savedRole && savedRole !== currentRole) {
-        setCurrentRole(savedRole);
-      }
-      setIsLoading(false);
+      return;
     }
-  }, [router, currentRole]);
+
+    const fetchProfile = async () => {
+      try {
+        const response = await fetch(`${apiUrl}/auth/me`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error("Unauthorized");
+        }
+
+        const profile = await response.json();
+        const primaryRole =
+          profile.roles?.[0]?.toLowerCase?.() ??
+          profile.user?.roles?.[0]?.toLowerCase?.() ??
+          "student";
+
+        setUser(profile.user ?? profile);
+        setCurrentRole(primaryRole);
+      } catch {
+        localStorage.removeItem("token");
+        localStorage.removeItem("userRole");
+        router.push("/login");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchProfile();
+  }, [router, apiUrl]);
 
   if (isLoading) {
     return (
@@ -100,7 +137,7 @@ export default function Home() {
         <Header
           currentView={currentView}
           currentRole={currentRole}
-          changeRole={setCurrentRole}
+          user={user}
         />
         <div id="contentArea">{renderContent()}</div>
       </main>

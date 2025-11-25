@@ -1,16 +1,87 @@
-import React from "react";
+"use client";
+
+import React, { useEffect, useMemo, useState } from "react";
+
+type UserListItem = {
+  id: number;
+  username: string;
+  fullName: string;
+  roles: string[];
+  group?: { id: number; name: string } | null;
+};
+
+const roleLabels: Record<string, string> = {
+  STUDENT: "Студент",
+  TEACHER: "Преподаватель",
+};
+
+const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
 const UserList: React.FC = () => {
-  const users = [
-    { name: "Иванов И.И.", role: "Студент", group: "ИС-41", dept: "" },
-    {
-      name: "Петров П.С.",
-      role: "Преподаватель",
-      group: "",
-      dept: "Кафедра ИС",
-    },
-    { name: "Смирнова Е.В.", role: "Студент", group: "ИС-41", dept: "" },
-  ];
+  const [users, setUsers] = useState<UserListItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      setError("Нет токена авторизации");
+      setIsLoading(false);
+      return;
+    }
+
+    const fetchUsers = async () => {
+      try {
+        const response = await fetch(`${apiUrl}/users`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (!response.ok) {
+          throw new Error("Не удалось загрузить пользователей");
+        }
+
+        const data = await response.json();
+        const allowedRoles = ["STUDENT", "TEACHER"];
+        const normalized = Array.isArray(data)
+          ? data.filter((user: UserListItem) =>
+              user.roles?.some((role) =>
+                allowedRoles.includes(role.toUpperCase()),
+              ),
+            )
+          : [];
+
+        setUsers(normalized);
+      } catch (err) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Произошла ошибка при загрузке пользователей",
+        );
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchUsers();
+  }, []);
+
+  const rows = useMemo(
+    () =>
+      users.map((user) => {
+        const role =
+          user.roles
+            .map((name) => roleLabels[name.toUpperCase()] ?? name)
+            .join(", ") || "—";
+
+        return {
+          id: user.id,
+          fullName: user.fullName,
+          role,
+          group: user.group?.name ?? "—",
+        };
+      }),
+    [users],
+  );
 
   return (
     <div className="card">
@@ -19,42 +90,62 @@ const UserList: React.FC = () => {
           display: "flex",
           justifyContent: "space-between",
           marginBottom: "20px",
+          alignItems: "center",
         }}
       >
-        <h3>Реестр пользователей</h3>
+        <h3 style={{ margin: 0 }}>Пользователи</h3>
         <button className="btn btn-primary">+ Добавить</button>
       </div>
-      <table className="user-table">
-        <thead>
-          <tr>
-            <th>ФИО</th>
-            <th>Роль</th>
-            <th>Группа/Кафедра</th>
-            <th>Действия</th>
-          </tr>
-        </thead>
-        <tbody>
-          {users.map((u, index) => (
-            <tr key={index}>
-              <td>{u.name}</td>
-              <td>
-                <span
-                  className="badge"
-                  style={{ background: "#eef2ff", color: "var(--primary)" }}
-                >
-                  {u.role}
-                </span>
-              </td>
-              <td>{u.group || u.dept}</td>
-              <td>
-                <a href="#" style={{ color: "var(--secondary)" }}>
-                  Ред.
-                </a>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+
+      {isLoading && <p>Загружаем список...</p>}
+      {!isLoading && error && (
+        <p style={{ color: "var(--danger)" }}>{error}</p>
+      )}
+
+      {!isLoading && !error && (
+        <>
+          {rows.length === 0 ? (
+            <p style={{ color: "var(--text-muted)" }}>
+              В базе нет студентов или преподавателей.
+            </p>
+          ) : (
+            <table className="user-table">
+              <thead>
+                <tr>
+                  <th>ФИО</th>
+                  <th>Роль</th>
+                  <th>Группа/кафедра</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((user) => (
+                  <tr key={user.id}>
+                    <td>{user.fullName}</td>
+                    <td>
+                      <span
+                        className="badge"
+                        style={{
+                          background: "#eef2ff",
+                          color: "var(--primary)",
+                        }}
+                      >
+                        {user.role}
+                      </span>
+                    </td>
+                    <td>{user.group}</td>
+                    <td>
+                      <a href="#" style={{ color: "var(--secondary)" }}>
+                        Открыть
+                      </a>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </>
+      )}
     </div>
   );
 };

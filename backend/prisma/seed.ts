@@ -90,33 +90,39 @@ async function main() {
 
   const ivanov = await prisma.user.upsert({
     where: { username: 'ivanov' },
-    update: {},
+    update: {
+      fullName: 'Иван Иванов',
+    },
     create: {
       username: 'ivanov',
       password: 'password123',
-      fullName: 'Ivan Ivanov',
+      fullName: 'Иван Иванов',
       roles: { connect: { id: teacherRole.id } },
     },
   });
 
   const petrova = await prisma.user.upsert({
     where: { username: 'petrova' },
-    update: {},
+    update: {
+      fullName: 'Анна Петрова',
+    },
     create: {
       username: 'petrova',
       password: 'password123',
-      fullName: 'Anna Petrova',
+      fullName: 'Анна Петрова',
       roles: { connect: { id: teacherRole.id } },
     },
   });
 
   const smirnov = await prisma.user.upsert({
     where: { username: 'smirnov' },
-    update: {},
+    update: {
+      fullName: 'Алексей Смирнов',
+    },
     create: {
       username: 'smirnov',
       password: 'student123',
-      fullName: 'Alexey Smirnov',
+      fullName: 'Алексей Смирнов',
       roles: { connect: { id: studentRole.id } },
       group: { connect: { id: group101.id } },
     },
@@ -124,11 +130,13 @@ async function main() {
 
   await prisma.user.upsert({
     where: { username: 'kuznetsova' },
-    update: {},
+    update: {
+      fullName: 'Елена Кузнецова',
+    },
     create: {
       username: 'kuznetsova',
       password: 'student123',
-      fullName: 'Elena Kuznetsova',
+      fullName: 'Елена Кузнецова',
       roles: { connect: { id: studentRole.id } },
       group: { connect: { id: group101.id } },
     },
@@ -136,11 +144,13 @@ async function main() {
 
   const sokolov = await prisma.user.upsert({
     where: { username: 'sokolov' },
-    update: {},
+    update: {
+      fullName: 'Максим Соколов',
+    },
     create: {
       username: 'sokolov',
       password: 'student123',
-      fullName: 'Maxim Sokolov',
+      fullName: 'Максим Соколов',
       roles: { connect: { id: studentRole.id } },
       group: { connect: { id: group102.id } },
     },
@@ -148,11 +158,13 @@ async function main() {
 
   await prisma.user.upsert({
     where: { username: 'admin' },
-    update: {},
+    update: {
+      fullName: 'Администратор системы',
+    },
     create: {
       username: 'admin',
       password: 'admin123',
-      fullName: 'System Admin',
+      fullName: 'Администратор системы',
       roles: { connect: { id: adminRole.id } },
     },
   });

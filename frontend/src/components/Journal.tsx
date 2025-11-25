@@ -1,47 +1,109 @@
-import React from "react";
+"use client";
+
+import React, { useEffect, useMemo, useState } from "react";
+
+type UserListItem = {
+  id: number;
+  username: string;
+  fullName: string;
+  roles: string[];
+  group?: { id: number; name: string } | null;
+};
+
+const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
 const Journal: React.FC = () => {
+  const [users, setUsers] = useState<UserListItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      setError("Нет токена авторизации");
+      setIsLoading(false);
+      return;
+    }
+
+    const fetchUsers = async () => {
+      try {
+        const response = await fetch(`${apiUrl}/users`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (!response.ok) {
+          throw new Error("Не удалось загрузить пользователей");
+        }
+
+        const data = await response.json();
+        const normalized = Array.isArray(data)
+          ? data.filter((user: UserListItem) =>
+              user.roles?.some((role) => role.toUpperCase() === "STUDENT"),
+            )
+          : [];
+
+        setUsers(normalized);
+      } catch (err) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Произошла ошибка при загрузке пользователей",
+        );
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchUsers();
+  }, []);
+
+  const rows = useMemo(
+    () =>
+      users.map((user) => ({
+        id: user.id,
+        fullName: user.fullName,
+        group: user.group?.name ?? "—",
+      })),
+    [users],
+  );
+
   return (
     <div className="card">
-      <h3>Мониторинг выполнения (Группа ИС-41)</h3>
-      <br />
-      <table className="user-table">
-        <thead>
-          <tr>
-            <th>Студент</th>
-            <th>Этап 1</th>
-            <th>Этап 2</th>
-            <th>ВКР Глава 1</th>
-            <th>Итог</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>Иванов И.И.</td>
-            <td>
-              <span style={{ color: "green" }}>✓</span>
-            </td>
-            <td>
-              <span style={{ color: "orange" }}>⏳</span>
-            </td>
-            <td>-</td>
-            <td>В процессе</td>
-          </tr>
-          <tr>
-            <td>Смирнова Е.В.</td>
-            <td>
-              <span style={{ color: "green" }}>✓</span>
-            </td>
-            <td>
-              <span style={{ color: "green" }}>✓</span>
-            </td>
-            <td>
-              <span style={{ color: "orange" }}>Проверка</span>
-            </td>
-            <td>В процессе</td>
-          </tr>
-        </tbody>
-      </table>
+      <h3 style={{ marginBottom: "16px" }}>Журнал контроля</h3>
+
+      {isLoading && <p>Загружаем...</p>}
+      {!isLoading && error && (
+        <p style={{ color: "var(--danger)" }}>{error}</p>
+      )}
+
+      {!isLoading && !error && (
+        <>
+          {rows.length === 0 ? (
+            <p style={{ color: "var(--text-muted)" }}>
+              В базе пока нет студентов.
+            </p>
+          ) : (
+            <table className="user-table">
+              <thead>
+                <tr>
+                  <th>ФИО</th>
+                  <th>Группа</th>
+                  <th>Статус</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((user) => (
+                  <tr key={user.id}>
+                    <td>{user.fullName}</td>
+                    <td>{user.group}</td>
+                    <td style={{ color: "var(--text-muted)" }}>—</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </>
+      )}
     </div>
   );
 };
