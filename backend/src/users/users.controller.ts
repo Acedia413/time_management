@@ -26,7 +26,8 @@ export class UsersController {
   findAll(): Promise<UserResponse[]> {
     return this.usersService.findStudentsAndTeachers();
   }
-  // Метод создания пользователя
+
+  // Создание записи пользователя
   @Post()
   create(
     @Body() dto: CreateUserDto,
@@ -35,7 +36,8 @@ export class UsersController {
     this.ensureAdmin(req);
     return this.usersService.createUser(dto);
   }
-  // Метод удаления пользователя
+
+  // Удаление записи пользователя
   @Delete(':id')
   remove(
     @Param('id', ParseIntPipe) id: number,
@@ -44,12 +46,13 @@ export class UsersController {
     this.ensureAdmin(req);
     return this.usersService.deleteUser(id);
   }
-  // Метод проверки "админа"
+
+  // Проверка роли "админ"
   private ensureAdmin(req: AuthenticatedRequest) {
     const roles = req.user?.roles ?? [];
     if (!roles.map((r) => r.toUpperCase()).includes('ADMIN')) {
       throw new ForbiddenException(
-        'Только администратор может выполнять это действие',
+        'Доступ запрещен: требуется роль администратора.',
       );
     }
   }

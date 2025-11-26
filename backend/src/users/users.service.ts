@@ -15,11 +15,12 @@ export type UserResponse = {
   roles: RoleName[];
   group: { id: number; name: string } | null;
 };
-// Сервис для работы с пользователями
+
 @Injectable()
 export class UsersService {
   constructor(private readonly prisma: PrismaService) {}
-  // Метод поиска студентов и преподавателей
+
+  // Получение списка студентов и преподавателей
   async findStudentsAndTeachers(): Promise<UserResponse[]> {
     const users = await this.prisma.user.findMany({
       where: {
@@ -34,11 +35,11 @@ export class UsersService {
     return users.map((user) => this.mapUser(user));
   }
 
-  // Метод создания пользователя
+  // Создание пользователя
   async createUser(data: CreateUserDto): Promise<UserResponse> {
     const roleName = data.role.toUpperCase() as RoleName;
     if (!Object.values(RoleName).includes(roleName)) {
-      throw new BadRequestException('Недопустимая роль');
+      throw new BadRequestException('Недопустимая роль.');
     }
 
     try {
@@ -61,14 +62,16 @@ export class UsersService {
         err instanceof PrismaClientKnownRequestError &&
         err.code === 'P2002'
       ) {
-        throw new BadRequestException('Пользователь с таким логином уже есть');
+        throw new BadRequestException(
+          'Пользователь с таким логином уже существует.',
+        );
       }
 
       throw err;
     }
   }
 
-  // Метод для удаления пользователя
+  // Удаление пользователя
   async deleteUser(id: number): Promise<{ success: true }> {
     try {
       await this.prisma.user.delete({ where: { id } });
@@ -78,7 +81,7 @@ export class UsersService {
         err instanceof PrismaClientKnownRequestError &&
         err.code === 'P2025'
       ) {
-        throw new NotFoundException('Пользователь не найден');
+        throw new NotFoundException('Пользователь не найден.');
       }
 
       throw err;
