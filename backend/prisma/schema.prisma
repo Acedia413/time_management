@@ -28,6 +28,9 @@ model User {
   password     String
   fullName     String
   roles        Role[]
+  departmentId Int?
+  department   Department?  @relation(fields: [departmentId], references: [id])
+  subjects     Subject[]
   groupId      Int?
   group        Group?       @relation(fields: [groupId], references: [id])
   createdTasks Task[]       @relation("TasksCreated")
@@ -39,6 +42,23 @@ model Role {
   name        RoleName     @unique
   users       User[]
   permissions Permission[] @relation("RolePermissions")
+}
+
+model Department {
+  id        Int       @id @default(autoincrement())
+  name      String    @unique
+  subjects  Subject[]
+  teachers  User[]
+}
+
+model Subject {
+  id            Int         @id @default(autoincrement())
+  name          String
+  departmentId  Int
+  department    Department  @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  teachers      User[]
+
+  @@unique([name, departmentId])
 }
 
 model Group {
