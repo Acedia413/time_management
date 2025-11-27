@@ -1,4 +1,4 @@
-import {
+﻿import {
   Body,
   Controller,
   Delete,
@@ -21,6 +21,11 @@ type AuthenticatedRequest = Request & { user?: { roles?: string[] } };
 @Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
+
+  @Get('count')
+  count(): Promise<{ count: number }> {
+    return this.usersService.countAll();
+  }
 
   @Get()
   findAll(): Promise<UserResponse[]> {

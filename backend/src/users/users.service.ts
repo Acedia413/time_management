@@ -1,4 +1,4 @@
-import {
+﻿import {
   BadRequestException,
   Injectable,
   NotFoundException,
@@ -19,6 +19,11 @@ export type UserResponse = {
 @Injectable()
 export class UsersService {
   constructor(private readonly prisma: PrismaService) {}
+
+  async countAll(): Promise<{ count: number }> {
+    const count = await this.prisma.user.count();
+    return { count };
+  }
 
   // Получение списка студентов и преподавателей
   async findStudentsAndTeachers(): Promise<UserResponse[]> {

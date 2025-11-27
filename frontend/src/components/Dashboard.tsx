@@ -1,10 +1,44 @@
-import React from "react";
+﻿'use client';
+
+import React, { useEffect, useState } from "react";
 
 interface DashboardProps {
   currentRole: string;
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ currentRole }) => {
+  const [userCount, setUserCount] = useState<number | null>(null);
+
+  const apiUrl =
+    process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      setUserCount(null);
+      return;
+    }
+
+    const load = async () => {
+      try {
+        const response = await fetch(`${apiUrl}/users/count`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (!response.ok) {
+          throw new Error("failed");
+        }
+
+        const data = await response.json();
+        setUserCount(typeof data.count === "number" ? data.count : null);
+      } catch {
+        setUserCount(null);
+      }
+    };
+
+    load();
+  }, [apiUrl]);
+
   const renderContent = () => {
     if (currentRole === "student") {
       return (
@@ -74,7 +108,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentRole }) => {
         <div className="dashboard-grid">
           <div className="card stat-card">
             <h3>Всего пользователей</h3>
-            <div className="value">142</div>
+            <div className="value">{userCount ?? "-"}</div>
           </div>
           <div className="card stat-card">
             <h3>Задач в системе</h3>
