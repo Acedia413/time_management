@@ -168,15 +168,16 @@ async function main() {
       roles: { connect: { id: adminRole.id } },
     },
   });
-
+  // Создание задач
   const restApiTask = await prisma.task.upsert({
     where: {
-      title_groupId: { title: 'REST API basics', groupId: group101.id },
+      title_groupId: { title: 'Основы REST API', groupId: group101.id },
     },
-    update: {},
+    update: { status: 'ACTIVE' },
     create: {
-      title: 'REST API basics',
-      description: 'Implement CRUD endpoints for student submissions.',
+      title: 'Основы REST API',
+      description: 'Реализовать CRUD-эндпоинты для студентских работ.',
+      status: 'ACTIVE',
       dueDate: new Date('2025-12-15T23:59:00Z'),
       createdById: ivanov.id,
       groupId: group101.id,
@@ -185,12 +186,13 @@ async function main() {
 
   const clientTask = await prisma.task.upsert({
     where: {
-      title_groupId: { title: 'Client project setup', groupId: group102.id },
+      title_groupId: { title: 'Клиентский проект: старт', groupId: group102.id },
     },
-    update: {},
+    update: { status: 'ACTIVE' },
     create: {
-      title: 'Client project setup',
-      description: 'Prepare project structure and push initial client draft.',
+      title: 'Клиентский проект: старт',
+      description: 'Подготовить структуру проекта и загрузить черновик клиента.',
+      status: 'ACTIVE',
       dueDate: new Date('2025-12-18T23:59:00Z'),
       createdById: petrova.id,
       groupId: group102.id,

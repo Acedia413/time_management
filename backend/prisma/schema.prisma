@@ -22,6 +22,12 @@ enum PermissionAction {
   MANAGE_USERS
 }
 
+enum TaskStatus {
+  DRAFT
+  ACTIVE
+  CLOSED
+}
+
 model User {
   id           Int          @id @default(autoincrement())
   username     String       @unique
@@ -79,6 +85,7 @@ model Task {
   title       String
   description String
   createdAt   DateTime     @default(now())
+  status      TaskStatus   @default(ACTIVE)
   dueDate     DateTime?
   createdById Int
   groupId     Int?
