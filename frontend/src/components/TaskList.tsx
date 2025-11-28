@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 
 interface TaskListProps {
   currentRole: string;
@@ -54,24 +54,22 @@ const TaskList: React.FC<TaskListProps> = ({ currentRole }) => {
 
   const apiUrl =
     process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+// Загружаю задачи с учетом токена и подготавливаю данные для отображения
+  const fetchTasks = useCallback(
+    async (withLoader = false) => {
+      if (withLoader) {
+        setIsLoading(true);
+      }
+      setError(null);
+      const token = localStorage.getItem("token");
+      if (!token) {
+        setError("Требуется авторизация. Перелогиньтесь.");
+        if (withLoader) {
+          setIsLoading(false);
+        }
+        return;
+      }
 
-  const stats = useMemo(() => {
-    const total = tasks.length;
-    const draft = tasks.filter((task) => task.status === "DRAFT").length;
-    const active = tasks.filter((task) => task.status === "ACTIVE").length;
-    const closed = tasks.filter((task) => task.status === "CLOSED").length;
-    return { total, draft, active, closed };
-  }, [tasks]);
-
-  useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      setError("Требуется авторизация. Перелогиньтесь.");
-      setIsLoading(false);
-      return;
-    }
-
-    const load = async () => {
       try {
         const response = await fetch(`${apiUrl}/tasks`, {
           headers: { Authorization: `Bearer ${token}` },
@@ -86,12 +84,25 @@ const TaskList: React.FC<TaskListProps> = ({ currentRole }) => {
       } catch (err) {
         setError(err instanceof Error ? err.message : "Ошибка загрузки задач.");
       } finally {
-        setIsLoading(false);
+        if (withLoader) {
+          setIsLoading(false);
+        }
       }
-    };
+    },
+    [apiUrl],
+  );
+// Подготавливаю статистику для отображения
+  const stats = useMemo(() => {
+    const total = tasks.length;
+    const draft = tasks.filter((task) => task.status === "DRAFT").length;
+    const active = tasks.filter((task) => task.status === "ACTIVE").length;
+    const closed = tasks.filter((task) => task.status === "CLOSED").length;
+    return { total, draft, active, closed };
+  }, [tasks]);
 
-    load();
-  }, [apiUrl]);
+  useEffect(() => {
+    fetchTasks(true);
+  }, [fetchTasks]);
 
   const rows = useMemo(
     () =>
@@ -148,6 +159,7 @@ const TaskList: React.FC<TaskListProps> = ({ currentRole }) => {
       setTasks((prev) =>
         prev.map((task) => (task.id === taskId ? updated : task)),
       );
+      await fetchTasks();
     } catch (err) {
       setActionError(
         err instanceof Error ? err.message : "Ошибка обновления задачи.",
@@ -182,6 +194,7 @@ const TaskList: React.FC<TaskListProps> = ({ currentRole }) => {
       }
 
       setTasks((prev) => prev.filter((task) => task.id !== taskId));
+      await fetchTasks();
     } catch (err) {
       setActionError(
         err instanceof Error ? err.message : "Ошибка удаления задачи.",
@@ -190,7 +203,7 @@ const TaskList: React.FC<TaskListProps> = ({ currentRole }) => {
       setActionLoading(null);
     }
   };
-
+// Отображаю статистику и список задач
   return (
     <div>
       {actionError && (
@@ -289,6 +302,7 @@ const TaskList: React.FC<TaskListProps> = ({ currentRole }) => {
                 status: "ACTIVE",
                 groupId: "",
               });
+              await fetchTasks();
             } catch (err) {
               setFormError(
                 err instanceof Error ? err.message : "Ошибка создания задачи.",
@@ -418,27 +432,27 @@ const TaskList: React.FC<TaskListProps> = ({ currentRole }) => {
               ) : (
                 <div style={{ display: "flex", gap: 8 }}>
                   {task.status !== "CLOSED" && (
-                    <button
-                      className="btn"
-                      style={{ color: "var(--primary)" }}
-                      disabled={actionLoading === task.id}
-                      onClick={() => handleClose(task.id)}
-                    >
-                      Закрыть
-                    </button>
-                  )}
                   <button
                     className="btn"
-                    style={{ color: "var(--danger)" }}
+                    style={{ color: "var(--primary)" }}
                     disabled={actionLoading === task.id}
-                    onClick={() => handleDelete(task.id)}
+                    onClick={() => handleClose(task.id)}
                   >
-                    Удалить
+                    {actionLoading === task.id ? "Закрываем..." : "Закрыть"}
                   </button>
-                </div>
-              )}
-            </div>
+                )}
+                <button
+                  className="btn"
+                  style={{ color: "var(--danger)" }}
+                  disabled={actionLoading === task.id}
+                  onClick={() => handleDelete(task.id)}
+                >
+                  {actionLoading === task.id ? "Удаляем..." : "Удалить"}
+                </button>
+              </div>
+            )}
           </div>
+        </div>
         ))
       )}
     </div>
