@@ -1,98 +1,142 @@
-import React from "react";
+'use client';
+
+import React, { useEffect, useMemo, useState } from "react";
 
 interface TaskListProps {
   currentRole: string;
 }
 
+type TaskItem = {
+  id: number;
+  title: string;
+  description: string;
+  status: "DRAFT" | "ACTIVE" | "CLOSED" | string;
+  dueDate: string | null;
+  createdBy: { id: number; fullName: string };
+  group: { id: number; name: string } | null;
+};
+// Подписи и стили для статусов задач
+const statusLabels: Record<string, string> = {
+  DRAFT: "Черновик",
+  ACTIVE: "В работе",
+  CLOSED: "Закрыта",
+};
+
+const statusClass: Record<string, string> = {
+  DRAFT: "badge-new",
+  ACTIVE: "badge-progress",
+  CLOSED: "badge-done",
+};
+// Загружаю задачи с учетом токена и подготавливаю данные для отображения
 const TaskList: React.FC<TaskListProps> = ({ currentRole }) => {
-  const tasks = [
-    {
-      id: 1,
-      title: "Отчет по 1 главе ВКР",
-      deadline: "2023-11-25",
-      status: "В работе",
-      priority: "Высокий",
-      assignedTo: "Иванов И.",
-      assignedBy: "Петров П.С.",
-    },
-    {
-      id: 2,
-      title: "Дневник практики (Неделя 2)",
-      deadline: "2023-11-20",
-      status: "Выполнено",
-      priority: "Средний",
-      assignedTo: "Иванов И.",
-      assignedBy: "Петров П.С.",
-    },
-    {
-      id: 3,
-      title: "Согласование темы",
-      deadline: "2023-10-15",
-      status: "Зачтено",
-      priority: "Низкий",
-      assignedTo: "Иванов И.",
-      assignedBy: "Сидоров А.А.",
-    },
-  ];
+  const [tasks, setTasks] = useState<TaskItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const apiUrl =
+    process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      setError("Требуется авторизация. Перелогиньтесь.");
+      setIsLoading(false);
+      return;
+    }
+
+    const load = async () => {
+      try {
+        const response = await fetch(`${apiUrl}/tasks`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (!response.ok) {
+          throw new Error("Не удалось загрузить список задач.");
+        }
+
+        const data = await response.json();
+        setTasks(Array.isArray(data) ? data : []);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Ошибка загрузки задач.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    load();
+  }, [apiUrl]);
+
+  const rows = useMemo(
+    () =>
+      tasks.map((task) => {
+        const label = statusLabels[task.status] ?? task.status;
+        const badgeClass = statusClass[task.status] ?? "badge-new";
+        const due =
+          task.dueDate && !Number.isNaN(Date.parse(task.dueDate))
+            ? new Date(task.dueDate).toLocaleDateString("ru-RU")
+            : "Без срока";
+        return { ...task, label, badgeClass, due };
+      }),
+    [tasks],
+  );
+
+  if (isLoading) {
+    return <p>Загружаем задачи...</p>;
+  }
+
+  if (error) {
+    return <p style={{ color: "var(--danger)" }}>{error}</p>;
+  }
 
   return (
     <div>
-      {currentRole === "teacher" && (
-        <button className="btn btn-primary" style={{ marginBottom: "20px" }}>
-          + Создать новую задачу
-        </button>
-      )}
-
-      {tasks.map((task) => {
-        let statusClass = "";
-        if (task.status === "Выполнено") statusClass = "badge-progress";
-        else if (task.status === "Зачтено") statusClass = "badge-done";
-        else statusClass = "badge-new";
-
-        return (
+      {rows.length === 0 ? (
+        <p style={{ color: "var(--text-muted)" }}>
+          Задачи пока не найдены.
+        </p>
+      ) : (
+        rows.map((task) => (
           <div className="task-card" key={task.id}>
             <div className="task-info">
-              <div style={{ marginBottom: "5px" }}>
-                <span className={`badge ${statusClass}`}>{task.status}</span>
-                <span
-                  className="badge"
-                  style={{
-                    background: "#f3f4f6",
-                    color: "#666",
-                    marginLeft: "8px",
-                  }}
-                >
-                  {task.priority}
-                </span>
+              <div style={{ marginBottom: "5px", display: "flex", gap: 8 }}>
+                <span className={`badge ${task.badgeClass}`}>{task.label}</span>
+                {task.group && (
+                  <span
+                    className="badge"
+                    style={{ background: "#f3f4f6", color: "#666" }}
+                  >
+                    {task.group.name}
+                  </span>
+                )}
               </div>
               <h4>{task.title}</h4>
+              <p style={{ color: "var(--text-muted)" }}>
+                {task.description}
+              </p>
               <div className="task-meta">
-                <span>📅 Срок сдачи: {task.deadline}</span>
+                <span>Срок: {task.due}</span>
                 <span>
-                  👤{" "}
-                  {currentRole === "student"
-                    ? "От: " + task.assignedBy
-                    : "Кому: " + task.assignedTo}
+                  Автор: {task.createdBy?.fullName ?? "Неизвестно"}
                 </span>
               </div>
             </div>
             <div className="task-actions">
-              {currentRole === "student" && task.status !== "Зачтено" ? (
+              {currentRole === "student" ? (
                 <button
                   className="btn"
                   style={{ border: "1px solid var(--border)" }}
                 >
-                  Загрузить файл 📎
+                  Открыть
                 </button>
               ) : (
                 <button className="btn" style={{ color: "var(--primary)" }}>
-                  Подробнее &rarr;
+                  Подробнее →
                 </button>
               )}
             </div>
           </div>
-        );
-      })}
+        ))
+      )}
     </div>
   );
 };
