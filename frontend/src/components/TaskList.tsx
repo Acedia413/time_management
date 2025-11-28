@@ -15,6 +15,14 @@ type TaskItem = {
   createdBy: { id: number; fullName: string };
   group: { id: number; name: string } | null;
 };
+
+type TaskForm = {
+  title: string;
+  description: string;
+  dueDate: string;
+  status: "DRAFT" | "ACTIVE" | "CLOSED";
+  groupId: string;
+};
 // Подписи и стили для статусов задач
 const statusLabels: Record<string, string> = {
   DRAFT: "Черновик",
@@ -32,6 +40,15 @@ const TaskList: React.FC<TaskListProps> = ({ currentRole }) => {
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [form, setForm] = useState<TaskForm>({
+    title: "",
+    description: "",
+    dueDate: "",
+    status: "ACTIVE",
+    groupId: "",
+  });
 
   const apiUrl =
     process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
@@ -87,9 +104,168 @@ const TaskList: React.FC<TaskListProps> = ({ currentRole }) => {
   if (error) {
     return <p style={{ color: "var(--danger)" }}>{error}</p>;
   }
-
+// Если пользователь имеет права на создание задач, отображаю форму создания
+// Исключительные ситуации обработаны
   return (
     <div>
+      {(currentRole === "teacher" || currentRole === "admin") && (
+        <form
+          className="card"
+          style={{ marginBottom: 16 }}
+          onSubmit={async (e) => {
+            e.preventDefault();
+            setFormError(null);
+            const token = localStorage.getItem("token");
+            if (!token) {
+              setFormError("Требуется авторизация. Перелогиньтесь.");
+              return;
+            }
+            if (!form.title.trim() || !form.description.trim()) {
+              setFormError("Укажите название и описание задачи.");
+              return;
+            }
+
+            setIsSubmitting(true);
+            try {
+              const payload: {
+                title: string;
+                description: string;
+                status: string;
+                dueDate?: string;
+                groupId?: number;
+              } = {
+                title: form.title.trim(),
+                description: form.description.trim(),
+                status: form.status,
+              };
+
+              if (form.dueDate.trim()) {
+                payload.dueDate = form.dueDate;
+              }
+              if (form.groupId.trim()) {
+                const parsed = Number(form.groupId);
+                if (Number.isNaN(parsed)) {
+                  throw new Error("ID группы должно быть числом.");
+                }
+                payload.groupId = parsed;
+              }
+
+              const response = await fetch(`${apiUrl}/tasks`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify(payload),
+              });
+
+              if (!response.ok) {
+                const details = await response.json().catch(() => null);
+                const message =
+                  (Array.isArray(details?.message)
+                    ? details.message[0]
+                    : details?.message) ??
+                  "Не удалось создать задачу.";
+                throw new Error(message);
+              }
+
+              const created = (await response.json()) as TaskItem;
+              setTasks((prev) => [created, ...prev]);
+              setForm({
+                title: "",
+                description: "",
+                dueDate: "",
+                status: "ACTIVE",
+                groupId: "",
+              });
+            } catch (err) {
+              setFormError(
+                err instanceof Error ? err.message : "Ошибка создания задачи.",
+              );
+            } finally {
+              setIsSubmitting(false);
+            }
+          }}
+        >
+          <h4 style={{ marginTop: 0, marginBottom: 12 }}>Создать задачу</h4>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+              gap: 12,
+            }}
+          >
+            <label className="form-group" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <span>Название</span>
+              <input
+                type="text"
+                value={form.title}
+                onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
+                placeholder="Например, Основы REST API"
+                required
+              />
+            </label>
+            <label className="form-group" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <span>Описание</span>
+              <input
+                type="text"
+                value={form.description}
+                onChange={(e) =>
+                  setForm((prev) => ({ ...prev, description: e.target.value }))
+                }
+                placeholder="Кратко опишите задачу"
+                required
+              />
+            </label>
+            <label className="form-group" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <span>Дедлайн</span>
+              <input
+                type="date"
+                value={form.dueDate}
+                onChange={(e) =>
+                  setForm((prev) => ({ ...prev, dueDate: e.target.value }))
+                }
+              />
+            </label>
+            <label className="form-group" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <span>Статус</span>
+              <select
+                value={form.status}
+                onChange={(e) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    status: e.target.value as TaskForm["status"],
+                  }))
+                }
+              >
+                <option value="ACTIVE">В работе</option>
+                <option value="DRAFT">Черновик</option>
+                <option value="CLOSED">Закрыта</option>
+              </select>
+            </label>
+            <label className="form-group" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <span>ID группы (опционально)</span>
+              <input
+                type="text"
+                value={form.groupId}
+                onChange={(e) =>
+                  setForm((prev) => ({ ...prev, groupId: e.target.value }))
+                }
+                placeholder="Например, 1"
+              />
+            </label>
+          </div>
+          {formError && (
+            <div style={{ color: "var(--danger)", marginTop: 8 }}>{formError}</div>
+          )}
+          <div style={{ marginTop: 12 }}>
+            <button className="btn btn-primary" type="submit" disabled={isSubmitting}>
+              {isSubmitting ? "Сохраняем..." : "Создать задачу"}
+            </button>
+          </div>
+        </form>
+      )}
+
       {rows.length === 0 ? (
         <p style={{ color: "var(--text-muted)" }}>
           Задачи пока не найдены.
