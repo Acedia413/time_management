@@ -67,9 +67,10 @@ export class TasksService {
     userId: number,
     roles: string[],
   ): Promise<TaskResponse> {
-    const isAllowed = roles
-      .map((r) => r.toUpperCase())
-      .some((r) => [RoleName.TEACHER, RoleName.ADMIN].includes(r as RoleName));
+    const normalizedRoles = roles.map((r) => r.toUpperCase()) as RoleName[];
+    const isAllowed = normalizedRoles.some(
+      (r) => r === RoleName.TEACHER || r === RoleName.ADMIN,
+    );
 
     if (!isAllowed) {
       throw new ForbiddenException('Недостаточно прав для создания задачи.');
@@ -174,7 +175,11 @@ export class TasksService {
     };
   }
 
-  async deleteTask(taskId: number, userId: number, roles: string[]) {
+  async deleteTask(
+    taskId: number,
+    userId: number,
+    roles: string[],
+  ): Promise<{ success: true }> {
     const existing = await this.prisma.task.findUnique({
       where: { id: taskId },
       select: { createdById: true },
@@ -191,6 +196,6 @@ export class TasksService {
     }
 
     await this.prisma.task.delete({ where: { id: taskId } });
-    return { success: true };
+    return { success: true as const };
   }
 }

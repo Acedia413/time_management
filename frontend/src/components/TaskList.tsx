@@ -55,6 +55,14 @@ const TaskList: React.FC<TaskListProps> = ({ currentRole }) => {
   const apiUrl =
     process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
+  const stats = useMemo(() => {
+    const total = tasks.length;
+    const draft = tasks.filter((task) => task.status === "DRAFT").length;
+    const active = tasks.filter((task) => task.status === "ACTIVE").length;
+    const closed = tasks.filter((task) => task.status === "CLOSED").length;
+    return { total, draft, active, closed };
+  }, [tasks]);
+
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) {
@@ -190,6 +198,27 @@ const TaskList: React.FC<TaskListProps> = ({ currentRole }) => {
           {actionError}
         </div>
       )}
+      <div
+        style={{
+          display: "flex",
+          gap: 12,
+          marginBottom: 12,
+          flexWrap: "wrap",
+        }}
+      >
+        <span className="badge" style={{ background: "#eef2ff", color: "#4338ca" }}>
+          Всего: {stats.total}
+        </span>
+        <span className="badge" style={{ background: "#fef3c7", color: "#92400e" }}>
+          Черновики: {stats.draft}
+        </span>
+        <span className="badge" style={{ background: "#ecfeff", color: "#0f766e" }}>
+          В работе: {stats.active}
+        </span>
+        <span className="badge" style={{ background: "#e5e7eb", color: "#374151" }}>
+          Закрыты: {stats.closed}
+        </span>
+      </div>
       {(currentRole === "teacher" || currentRole === "admin") && (
         <form
           className="card"
