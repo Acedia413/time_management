@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useEffect, useMemo, useState } from "react";
 
@@ -40,6 +40,8 @@ const TaskList: React.FC<TaskListProps> = ({ currentRole }) => {
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [actionLoading, setActionLoading] = useState<number | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [form, setForm] = useState<TaskForm>({
@@ -106,8 +108,88 @@ const TaskList: React.FC<TaskListProps> = ({ currentRole }) => {
   }
 // Если пользователь имеет права на создание задач, отображаю форму создания
 // Исключительные ситуации обработаны
+  const handleClose = async (taskId: number) => {
+    setActionError(null);
+    const token = localStorage.getItem("token");
+    if (!token) {
+      setActionError("Необходима авторизация");
+      return;
+    }
+    setActionLoading(taskId);
+    try {
+      const response = await fetch(`${apiUrl}/tasks/${taskId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ status: "CLOSED" }),
+      });
+
+      if (!response.ok) {
+        const details = await response.json().catch(() => null);
+        const message =
+          (Array.isArray(details?.message)
+            ? details.message[0]
+            : details?.message) ??
+          "Ошибка обновления задачи.";
+        throw new Error(message);
+      }
+
+      const updated = (await response.json()) as TaskItem;
+      setTasks((prev) =>
+        prev.map((task) => (task.id === taskId ? updated : task)),
+      );
+    } catch (err) {
+      setActionError(
+        err instanceof Error ? err.message : "Ошибка обновления задачи.",
+      );
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleDelete = async (taskId: number) => {
+    setActionError(null);
+    const token = localStorage.getItem("token");
+    if (!token) {
+      setActionError("Необходима авторизация");
+      return;
+    }
+    setActionLoading(taskId);
+    try {
+      const response = await fetch(`${apiUrl}/tasks/${taskId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!response.ok) {
+        const details = await response.json().catch(() => null);
+        const message =
+          (Array.isArray(details?.message)
+            ? details.message[0]
+            : details?.message) ??
+          "Ошибка удаления задачи.";
+        throw new Error(message);
+      }
+
+      setTasks((prev) => prev.filter((task) => task.id !== taskId));
+    } catch (err) {
+      setActionError(
+        err instanceof Error ? err.message : "Ошибка удаления задачи.",
+      );
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   return (
     <div>
+      {actionError && (
+        <div style={{ color: "var(--danger)", marginBottom: 8 }}>
+          {actionError}
+        </div>
+      )}
       {(currentRole === "teacher" || currentRole === "admin") && (
         <form
           className="card"
@@ -305,9 +387,26 @@ const TaskList: React.FC<TaskListProps> = ({ currentRole }) => {
                   Открыть
                 </button>
               ) : (
-                <button className="btn" style={{ color: "var(--primary)" }}>
-                  Подробнее →
-                </button>
+                <div style={{ display: "flex", gap: 8 }}>
+                  {task.status !== "CLOSED" && (
+                    <button
+                      className="btn"
+                      style={{ color: "var(--primary)" }}
+                      disabled={actionLoading === task.id}
+                      onClick={() => handleClose(task.id)}
+                    >
+                      Закрыть
+                    </button>
+                  )}
+                  <button
+                    className="btn"
+                    style={{ color: "var(--danger)" }}
+                    disabled={actionLoading === task.id}
+                    onClick={() => handleDelete(task.id)}
+                  >
+                    Удалить
+                  </button>
+                </div>
               )}
             </div>
           </div>
@@ -318,3 +417,5 @@ const TaskList: React.FC<TaskListProps> = ({ currentRole }) => {
 };
 
 export default TaskList;
+
+
