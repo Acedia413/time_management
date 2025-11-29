@@ -1,13 +1,14 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Dashboard from "../components/Dashboard";
 import Header from "../components/Header";
 import Journal from "../components/Journal";
 import Sidebar from "../components/Sidebar";
 import TaskList from "../components/TaskList";
 import UserList from "../components/UserList";
+import { useProfile } from "../components/ProfileProvider";
 
 type UserProfile = {
   id: number;
@@ -18,16 +19,12 @@ type UserProfile = {
 };
 
 export default function Home() {
+  const { user, role: profileRole, loading: profileLoading } = useProfile();
   const [currentRole, setCurrentRole] = useState("student");
   const [currentView, setCurrentView] = useState("dashboard");
   const [tasksMode, setTasksMode] = useState<"all" | "my" | "teacher">("all");
-  const [isLoading, setIsLoading] = useState(true);
-  const [user, setUser] = useState<UserProfile | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
-
-  const apiUrl =
-    process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
   useEffect(() => {
     const requestedView = searchParams.get("view");
@@ -42,45 +39,10 @@ export default function Home() {
   }, [searchParams]);
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      router.push("/login");
-      return;
-    }
+    setCurrentRole(profileRole ?? "student");
+  }, [profileRole]);
 
-    const fetchProfile = async () => {
-      try {
-        const response = await fetch(`${apiUrl}/auth/me`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        if (!response.ok) {
-          throw new Error("Unauthorized");
-        }
-
-        const profile = await response.json();
-        const primaryRole =
-          profile.roles?.[0]?.toLowerCase?.() ??
-          profile.user?.roles?.[0]?.toLowerCase?.() ??
-          "student";
-
-        setUser(profile.user ?? profile);
-        setCurrentRole(primaryRole);
-      } catch {
-        localStorage.removeItem("token");
-        localStorage.removeItem("userRole");
-        router.push("/login");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchProfile();
-  }, [router, apiUrl, currentView]);
-
-  if (isLoading) {
+  if (profileLoading) {
     return (
       <div
         style={{
@@ -182,6 +144,7 @@ export default function Home() {
           setCurrentView(view);
         }}
         currentRole={currentRole}
+        user={user}
       />
       <main className="main-content">
         <Header
