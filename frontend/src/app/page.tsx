@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import Dashboard from "../components/Dashboard";
 import Header from "../components/Header";
@@ -24,9 +24,22 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState<UserProfile | null>(null);
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const apiUrl =
     process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+
+  useEffect(() => {
+    const requestedView = searchParams.get("view");
+    if (
+      requestedView &&
+      ["dashboard", "tasks", "users", "journal", "settings"].includes(
+        requestedView,
+      )
+    ) {
+      setCurrentView(requestedView);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -65,7 +78,7 @@ export default function Home() {
     };
 
     fetchProfile();
-  }, [router, apiUrl]);
+  }, [router, apiUrl, currentView]);
 
   if (isLoading) {
     return (
@@ -161,7 +174,13 @@ export default function Home() {
     <div style={{ minHeight: "100vh" }}>
       <Sidebar
         currentView={currentView}
-        navigate={setCurrentView}
+        navigate={(view) => {
+          if (view === "tasks") {
+            router.push("/tasks");
+            return;
+          }
+          setCurrentView(view);
+        }}
         currentRole={currentRole}
       />
       <main className="main-content">
