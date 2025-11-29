@@ -1,6 +1,7 @@
 ﻿'use client';
 
 import React, { useEffect, useMemo, useState, useCallback } from "react";
+import Link from "next/link";
 
 interface TaskListProps {
   currentRole: string;
@@ -179,7 +180,7 @@ const TaskList: React.FC<TaskListProps> = ({ currentRole, currentUserId, mode = 
       setActionLoading(null);
     }
   };
-
+// Если пользователь имеет права на удаление задач, отображаю кнопку удаления
   const handleDelete = async (taskId: number) => {
     setActionError(null);
     const token = localStorage.getItem("token");
@@ -432,38 +433,39 @@ const TaskList: React.FC<TaskListProps> = ({ currentRole, currentUserId, mode = 
                 </span>
               </div>
             </div>
-            <div className="task-actions">
+              <div className="task-actions">
               {currentRole === "student" ? (
-                <button
+                <Link
+                  href={`/tasks/${task.id}?from=${mode ?? "all"}`}
                   className="btn"
                   style={{ border: "1px solid var(--border)" }}
                 >
                   Открыть
-                </button>
+                </Link>
               ) : (
                 <div style={{ display: "flex", gap: 8 }}>
                   {task.status !== "CLOSED" && (
+                    <button
+                      className="btn"
+                      style={{ color: "var(--primary)" }}
+                      disabled={actionLoading === task.id}
+                      onClick={() => handleClose(task.id)}
+                    >
+                      {actionLoading === task.id ? "Закрываем..." : "Закрыть"}
+                    </button>
+                  )}
                   <button
                     className="btn"
-                    style={{ color: "var(--primary)" }}
+                    style={{ color: "var(--danger)" }}
                     disabled={actionLoading === task.id}
-                    onClick={() => handleClose(task.id)}
+                    onClick={() => handleDelete(task.id)}
                   >
-                    {actionLoading === task.id ? "Закрываем..." : "Закрыть"}
+                    {actionLoading === task.id ? "Удаляем..." : "Удалить"}
                   </button>
-                )}
-                <button
-                  className="btn"
-                  style={{ color: "var(--danger)" }}
-                  disabled={actionLoading === task.id}
-                  onClick={() => handleDelete(task.id)}
-                >
-                  {actionLoading === task.id ? "Удаляем..." : "Удалить"}
-                </button>
-              </div>
-            )}
+                </div>
+              )}
+            </div>
           </div>
-        </div>
         ))
       )}
     </div>
