@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 
 interface SidebarProps {
   currentView: string;
@@ -19,6 +19,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   currentRole,
   user,
 }) => {
+  const [showMenu, setShowMenu] = useState(false);
   const isVisible = (roles: string[]) => roles.includes(currentRole);
 
   const primaryRole =
@@ -111,7 +112,12 @@ const Sidebar: React.FC<SidebarProps> = ({
         )}
       </nav>
       <div className="sidebar-footer">
-        <div className="user-card">
+        <div
+          className="user-card"
+          style={{ position: "relative", cursor: "pointer" }}
+          onClick={() => setShowMenu((prev) => !prev)}
+          onMouseLeave={() => setShowMenu(false)}
+        >
           <div className="user-info">
             <div
               className="avatar"
@@ -130,23 +136,57 @@ const Sidebar: React.FC<SidebarProps> = ({
               <div className="user-role">{primaryRole}</div>
             </div>
           </div>
-          <button onClick={handleLogout} className="logout-btn" title="Выйти">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+          {showMenu && (
+            <div
+              style={{
+                position: "absolute",
+                left: 0,
+                bottom: "calc(100% + 8px)",
+                background: "#fff",
+                border: "1px solid var(--border)",
+                borderRadius: 8,
+                boxShadow: "0 8px 20px rgba(0,0,0,0.08)",
+                minWidth: 180,
+                zIndex: 5,
+                overflow: "hidden",
+              }}
             >
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-              <polyline points="16 17 21 12 16 7"></polyline>
-              <line x1="21" y1="12" x2="9" y2="12"></line>
-            </svg>
-          </button>
+              <button
+                style={{
+                  width: "100%",
+                  textAlign: "left",
+                  padding: "10px 12px",
+                  background: "transparent",
+                  border: "none",
+                  cursor: "pointer",
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowMenu(false);
+                  navigate("settings");
+                }}
+              >
+                Настройки профиля
+              </button>
+              <button
+                style={{
+                  width: "100%",
+                  textAlign: "left",
+                  padding: "10px 12px",
+                  background: "transparent",
+                  border: "none",
+                  cursor: "pointer",
+                  color: "var(--danger)",
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleLogout();
+                }}
+              >
+                Выйти
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </aside>
