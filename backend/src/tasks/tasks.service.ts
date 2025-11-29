@@ -18,7 +18,7 @@ export type TaskResponse = {
 @Injectable()
 export class TasksService {
   constructor(private readonly prisma: PrismaService) {}
-
+  // Отдает все доступные пользователю задачи
   async findAllForUser(userId: number, roles: string[]): Promise<TaskResponse[]> {
     const isStudent = roles.map((r) => r.toUpperCase()).includes(RoleName.STUDENT);
     let groupId: number | null = null;
@@ -62,6 +62,58 @@ export class TasksService {
     }));
   }
 
+  // Обработка GET /tasks/:id с проверкой доступа для студента
+  async findOneForUser(
+    taskId: number,
+    userId: number,
+    roles: string[],
+  ): Promise<TaskResponse> {
+    const isStudent = roles.map((r) => r.toUpperCase()).includes(RoleName.STUDENT);
+    let userGroupId: number | null = null;
+
+    if (isStudent) {
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { groupId: true },
+      });
+      userGroupId = user?.groupId ?? null;
+    }
+
+    const task = await this.prisma.task.findUnique({
+      where: { id: taskId },
+      include: {
+        group: true,
+        createdBy: { select: { id: true, fullName: true } },
+      },
+    });
+
+    if (!task) {
+      throw new NotFoundException('Задача не найдена.');
+    }
+
+    if (isStudent) {
+      const allowed =
+        task.groupId === null || (userGroupId !== null && task.groupId === userGroupId);
+      if (!allowed) {
+        throw new ForbiddenException('Недостаточно прав для просмотра задачи.');
+      }
+    }
+
+    return {
+      id: task.id,
+      title: task.title,
+      description: task.description,
+      status: task.status,
+      createdAt: task.createdAt,
+      dueDate: task.dueDate ?? null,
+      group: task.group ? { id: task.group.id, name: task.group.name } : null,
+      createdBy: {
+        id: task.createdBy.id,
+        fullName: task.createdBy.fullName,
+      },
+    };
+  }
+// Обработка POST /tasks
   async createTask(
     dto: CreateTaskDto,
     userId: number,
@@ -109,7 +161,7 @@ export class TasksService {
       },
     };
   }
-
+  // Обработка PATCH /tasks/:id
   async updateTask(
     taskId: number,
     dto: UpdateTaskDto,
@@ -174,7 +226,7 @@ export class TasksService {
       },
     };
   }
-
+  // Обработка DELETE /tasks/:id
   async deleteTask(
     taskId: number,
     userId: number,
