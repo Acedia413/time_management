@@ -159,12 +159,12 @@ async function main() {
   await prisma.user.upsert({
     where: { username: 'admin' },
     update: {
-      fullName: 'Администратор системы',
+      fullName: 'Ольга Петрова',
     },
     create: {
       username: 'admin',
       password: 'admin123',
-      fullName: 'Администратор системы',
+      fullName: 'Ольга Петрова',
       roles: { connect: { id: adminRole.id } },
     },
   });
