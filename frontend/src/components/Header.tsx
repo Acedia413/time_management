@@ -16,7 +16,7 @@ interface HeaderProps {
 
 const viewTitles: Record<string, { title: string; subtitle: string }> = {
   dashboard: { title: "Панель управления", subtitle: "Обзор задач и активности" },
-  tasks: { title: "Задачи", subtitle: "Список задач и их статусы" },
+  tasks: { title: "Задачи", subtitle: "Выберите нужный список" },
   users: { title: "Пользователи", subtitle: "Справочник учетных записей" },
   journal: { title: "Журнал активности", subtitle: "История действий и проверок" },
   settings: { title: "Настройки", subtitle: "Параметры системы" },

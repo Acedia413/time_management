@@ -20,6 +20,7 @@ type UserProfile = {
 export default function Home() {
   const [currentRole, setCurrentRole] = useState("student");
   const [currentView, setCurrentView] = useState("dashboard");
+  const [tasksMode, setTasksMode] = useState<"all" | "my" | "teacher">("all");
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState<UserProfile | null>(null);
   const router = useRouter();
@@ -106,7 +107,37 @@ export default function Home() {
       case "dashboard":
         return <Dashboard currentRole={currentRole} />;
       case "tasks":
-        return <TaskList currentRole={currentRole} />;
+        return currentRole === "student" ? (
+          <div>
+            <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+              <button
+                className={`btn ${tasksMode === "all" ? "btn-primary" : ""}`}
+                onClick={() => setTasksMode("all")}
+              >
+                Все задачи
+              </button>
+              <button
+                className={`btn ${tasksMode === "my" ? "btn-primary" : ""}`}
+                onClick={() => setTasksMode("my")}
+              >
+                Мои задачи
+              </button>
+              <button
+                className={`btn ${tasksMode === "teacher" ? "btn-primary" : ""}`}
+                onClick={() => setTasksMode("teacher")}
+              >
+                Задачи преподавателей
+              </button>
+            </div>
+            <TaskList
+              currentRole={currentRole}
+              currentUserId={user?.id}
+              mode={tasksMode}
+            />
+          </div>
+        ) : (
+          <TaskList currentRole={currentRole} currentUserId={user?.id} mode="all" />
+        );
       case "users":
         return <UserList />;
       case "journal":

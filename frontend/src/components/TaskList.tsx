@@ -4,6 +4,8 @@ import React, { useEffect, useMemo, useState, useCallback } from "react";
 
 interface TaskListProps {
   currentRole: string;
+  currentUserId?: number;
+  mode?: "all" | "my" | "teacher";
 }
 
 type TaskItem = {
@@ -36,7 +38,7 @@ const statusClass: Record<string, string> = {
   CLOSED: "badge-done",
 };
 // Загружаю задачи с учетом токена и подготавливаю данные для отображения
-const TaskList: React.FC<TaskListProps> = ({ currentRole }) => {
+const TaskList: React.FC<TaskListProps> = ({ currentRole, currentUserId, mode = "all" }) => {
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -91,14 +93,23 @@ const TaskList: React.FC<TaskListProps> = ({ currentRole }) => {
     },
     [apiUrl],
   );
-// Подготавливаю статистику для отображения
+  const viewTasks = useMemo(() => {
+    if (mode === "my" && currentUserId) {
+      return tasks.filter((task) => task.createdBy?.id === currentUserId);
+    }
+    if (mode === "teacher" && currentRole === "student" && currentUserId) {
+      return tasks.filter((task) => task.createdBy?.id !== currentUserId);
+    }
+    return tasks;
+  }, [tasks, mode, currentUserId, currentRole]);
+  // Подготавливаю статистику для отображения
   const stats = useMemo(() => {
-    const total = tasks.length;
-    const draft = tasks.filter((task) => task.status === "DRAFT").length;
-    const active = tasks.filter((task) => task.status === "ACTIVE").length;
-    const closed = tasks.filter((task) => task.status === "CLOSED").length;
+    const total = viewTasks.length;
+    const draft = viewTasks.filter((task) => task.status === "DRAFT").length;
+    const active = viewTasks.filter((task) => task.status === "ACTIVE").length;
+    const closed = viewTasks.filter((task) => task.status === "CLOSED").length;
     return { total, draft, active, closed };
-  }, [tasks]);
+  }, [viewTasks]);
 
   useEffect(() => {
     fetchTasks(true);
@@ -106,7 +117,7 @@ const TaskList: React.FC<TaskListProps> = ({ currentRole }) => {
 
   const rows = useMemo(
     () =>
-      tasks.map((task) => {
+      viewTasks.map((task) => {
         const label = statusLabels[task.status] ?? task.status;
         const badgeClass = statusClass[task.status] ?? "badge-new";
         const due =
@@ -115,7 +126,7 @@ const TaskList: React.FC<TaskListProps> = ({ currentRole }) => {
             : "Без срока";
         return { ...task, label, badgeClass, due };
       }),
-    [tasks],
+    [viewTasks],
   );
 
   if (isLoading) {
