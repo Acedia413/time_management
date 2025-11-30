@@ -16,6 +16,7 @@ import { TasksService, TaskResponse } from './tasks.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { Request } from 'express';
 import { UpdateTaskDto } from './dto/update-task.dto';
+import { CreateSubmissionDto } from './dto/create-submission.dto';
 // Интерфейс для аутентифицированного запроса
 type AuthenticatedRequest = Request & {
   user?: { sub: number; roles?: string[] };
@@ -102,5 +103,19 @@ export class TasksController {
       throw new UnauthorizedException();
     }
     return this.tasksService.getSubmissionsForTask(id, userId, roles);
+  }
+  // Создает отправку
+  @Post(':id/submissions')
+  createSubmission(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: CreateSubmissionDto,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    const userId = req.user?.sub;
+    const roles = req.user?.roles ?? [];
+    if (!userId) {
+      throw new UnauthorizedException();
+    }
+    return this.tasksService.createSubmission(id, userId, roles, dto);
   }
 }

@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma.service';
 import { RoleName, TaskStatus } from '@prisma/client';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
+import { CreateSubmissionDto } from './dto/create-submission.dto';
 
 export type TaskResponse = {
   id: number;
@@ -146,6 +147,42 @@ export class TasksService {
         fullName: submission.student.fullName,
       },
     }));
+  }
+// Метод создания отправки
+  async createSubmission(
+    taskId: number,
+    userId: number,
+    roles: string[],
+    dto: CreateSubmissionDto,
+  ): Promise<SubmissionResponse> {
+    // Проверяем доступ к задаче
+    await this.findOneForUser(taskId, userId, roles);
+
+    const data = {
+      content: dto.content ?? null,
+      fileUrl: dto.fileUrl ?? null,
+      submittedAt: new Date(),
+      taskId,
+      studentId: userId,
+    };
+
+    const saved = await this.prisma.submission.upsert({
+      where: { taskId_studentId: { taskId, studentId: userId } },
+      update: data,
+      create: data,
+      include: { student: { select: { id: true, fullName: true } } },
+    });
+
+    return {
+      id: saved.id,
+      content: saved.content ?? null,
+      fileUrl: saved.fileUrl ?? null,
+      submittedAt: saved.submittedAt,
+      student: {
+        id: saved.student.id,
+        fullName: saved.student.fullName,
+      },
+    };
   }
 // Обработка POST /tasks
   async createTask(

@@ -17,10 +17,18 @@ type TaskItem = {
   group: { id: number; name: string } | null;
 };
 
+type SubmissionItem = {
+  id: number;
+  content: string | null;
+  fileUrl: string | null;
+  submittedAt: string;
+  student: { id: number; fullName: string };
+};
+
 const statusLabels: Record<string, string> = {
-  DRAFT: "گگç‘?گ?گ?گ?گٌگَ",
-  ACTIVE: "گ' ‘?گّگ+گ?‘'گç",
-  CLOSED: "گ-گّگَ‘?‘<‘'گّ",
+  DRAFT: "Черновик",
+  ACTIVE: "В работе",
+  CLOSED: "Закрыта",
 };
 
 export default function TaskDetailPage() {
@@ -31,6 +39,13 @@ export default function TaskDetailPage() {
   const currentRole = profileRole ?? "student";
   const [task, setTask] = useState<TaskItem | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [submissions, setSubmissions] = useState<SubmissionItem[]>([]);
+  const [form, setForm] = useState<{ content: string; fileUrl: string }>({
+    content: "",
+    fileUrl: "",
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const apiUrl =
     process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
@@ -50,25 +65,38 @@ export default function TaskDetailPage() {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (!singleResponse.ok) {
-          throw new Error("گ?گç ‘?گ?گّگ>گ?‘?‘? گْگّگ?‘?‘?گْگٌ‘'‘? گْگّگ?گّ‘ط‘?.");
+          throw new Error("Не удалось загрузить задачу.");
         }
         const found = (await singleResponse.json()) as TaskItem;
         setTask(found);
+
+        const submissionsResponse = await fetch(
+          `${apiUrl}/tasks/${params?.id}/submissions`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          },
+        );
+        if (submissionsResponse.ok) {
+          const subs = (await submissionsResponse.json()) as SubmissionItem[];
+          setSubmissions(subs);
+        }
       } catch (e) {
-        setError(e instanceof Error ? e.message : "گ?‘?گٌگ+گَگّ گْگّگ?‘?‘?گْگَگٌ گْگّگ?گّ‘طگٌ.");
+        setError(
+          e instanceof Error ? e.message : "Ошибка загрузки задачи.",
+        );
       }
     };
 
     load();
   }, [router, apiUrl, params?.id]);
-  // گ?گ>گçگ+گ?‘<گç گَ‘?گ?‘?گَگٌ گ?‘'گ?گ+‘?گّگگّ‘?‘'‘?‘? گُگ? گُگّ‘?گّگ?گç‘'‘?‘? from
+
   const breadcrumb = useMemo(() => {
     const base =
       from === "my"
-        ? { label: "گ?گ?گٌ گْگّگ?گّ‘طگٌ", href: "/tasks/my" }
+        ? { label: "Мои задачи", href: "/tasks/my" }
         : from === "teacher"
-          ? { label: "گ-گّگ?گّ‘طگٌ گُ‘?گçگُگ?گ?گّگ?گّ‘'گçگ>گçگü", href: "/tasks/teacher" }
-          : { label: "گ-گّگ?گّ‘طگٌ", href: "/tasks" };
+          ? { label: "Задачи преподавателей", href: "/tasks/teacher" }
+          : { label: "Задачи", href: "/tasks" };
     return base;
   }, [from]);
 
@@ -92,13 +120,13 @@ export default function TaskDetailPage() {
         <Header currentView="tasks" currentRole={currentRole} user={user} />
         <div id="contentArea">
           <div style={{ marginBottom: 12 }}>
-            <Link href="/" style={{ marginRight: 8 }}>گ"گ>گّگ?گ?گّ‘?</Link>
+            <Link href="/" style={{ marginRight: 8 }}>Главная</Link>
             <span style={{ marginRight: 8 }}>/</span>
             <Link href={breadcrumb.href} style={{ marginRight: 8 }}>
               {breadcrumb.label}
             </Link>
             <span style={{ marginRight: 8 }}>/</span>
-            <span>{task?.title ?? "گ-گّگ?گّ‘طگّ"}</span>
+            <span>{task?.title ?? "Задача"}</span>
           </div>
           {error && (
             <div style={{ color: "var(--danger)", marginBottom: 12 }}>
@@ -119,15 +147,158 @@ export default function TaskDetailPage() {
               <p style={{ color: "var(--text-muted)" }}>{task.description}</p>
               <div style={{ display: "flex", gap: 16, color: "var(--text-muted)" }}>
                 <span>
-                  گ?گ?‘'گ?‘?: {task.createdBy?.fullName ?? "گ?گçگٌگْگ?گç‘?‘'گ?گ?"}
+                  Автор: {task.createdBy?.fullName ?? "Неизвестно"}
                 </span>
                 <span>
-                  گِ‘?گ?گَ:{" "}
+                  Срок:{" "}
                   {task.dueDate && !Number.isNaN(Date.parse(task.dueDate))
                     ? new Date(task.dueDate).toLocaleDateString("ru-RU")
-                    : "گ'گçگْ ‘?‘?گ?گَگّ"}
+                    : "Без срока"}
                 </span>
               </div>
+            </div>
+          )}
+          {submissions.length > 0 && (
+            <div className="card" style={{ marginTop: 12 }}>
+              <h4 style={{ marginTop: 0, marginBottom: 8 }}>Отправки</h4>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {submissions.map((sub) => (
+                  <div
+                    key={sub.id}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 12,
+                      padding: "10px 12px",
+                      border: "1px solid var(--border)",
+                      borderRadius: 8,
+                    }}
+                  >
+                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                      <span style={{ fontWeight: 600 }}>
+                        {sub.student?.fullName ?? "Неизвестный студент"}
+                      </span>
+                      <span style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>
+                        {new Date(sub.submittedAt).toLocaleString("ru-RU")}
+                      </span>
+                      {sub.content && (
+                        <span style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>
+                          {sub.content}
+                        </span>
+                      )}
+                    </div>
+                    {sub.fileUrl ? (
+                      <a
+                        href={sub.fileUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="btn"
+                        style={{ border: "1px solid var(--border)" }}
+                      >
+                        Скачать
+                      </a>
+                    ) : (
+                      <span style={{ color: "var(--text-muted)" }}>Файл не приложен</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {currentRole === "student" && (
+            <div className="card" style={{ marginTop: 12 }}>
+              <h4 style={{ marginTop: 0, marginBottom: 8 }}>Добавить отправку</h4>
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  setFormError(null);
+                  const token = localStorage.getItem("token");
+                  if (!token) {
+                    setFormError("Требуется авторизация");
+                    return;
+                  }
+                  setIsSubmitting(true);
+                  try {
+                    const payload: { content?: string; fileUrl?: string } = {};
+                    if (form.content.trim()) {
+                      payload.content = form.content.trim();
+                    }
+                    if (form.fileUrl.trim()) {
+                      payload.fileUrl = form.fileUrl.trim();
+                    }
+                    if (!payload.content && !payload.fileUrl) {
+                      throw new Error("Укажите описание или ссылку на файл");
+                    }
+                    const response = await fetch(
+                      `${apiUrl}/tasks/${params?.id}/submissions`,
+                      {
+                        method: "POST",
+                        headers: {
+                          "Content-Type": "application/json",
+                          Authorization: `Bearer ${token}`,
+                        },
+                        body: JSON.stringify(payload),
+                      },
+                    );
+                    if (!response.ok) {
+                      const details = await response.json().catch(() => null);
+                      const message =
+                        (Array.isArray(details?.message)
+                          ? details.message[0]
+                          : details?.message) ?? "Не удалось сохранить отправку.";
+                      throw new Error(message);
+                    }
+                    const saved = (await response.json()) as SubmissionItem;
+                    setSubmissions((prev) => {
+                      const exists = prev.some((s) => s.id === saved.id);
+                      if (exists) {
+                        return prev.map((s) => (s.id === saved.id ? saved : s));
+                      }
+                      return [saved, ...prev];
+                    });
+                    setForm({ content: "", fileUrl: "" });
+                  } catch (err) {
+                    setFormError(
+                      err instanceof Error ? err.message : "Ошибка сохранения."
+                    );
+                  } finally {
+                    setIsSubmitting(false);
+                  }
+                }}
+                style={{ display: "flex", flexDirection: "column", gap: 10 }}
+              >
+                <label className="form-group" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <span>Описание (опционально)</span>
+                  <input
+                    type="text"
+                    value={form.content}
+                    onChange={(e) =>
+                      setForm((prev) => ({ ...prev, content: e.target.value }))
+                    }
+                    placeholder="Краткое описание отправки"
+                  />
+                </label>
+                <label className="form-group" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <span>Ссылка на файл</span>
+                  <input
+                    type="text"
+                    value={form.fileUrl}
+                    onChange={(e) =>
+                      setForm((prev) => ({ ...prev, fileUrl: e.target.value }))
+                    }
+                    placeholder="https://..."
+                  />
+                </label>
+                {formError && (
+                  <div style={{ color: "var(--danger)" }}>{formError}</div>
+                )}
+                <div>
+                  <button className="btn btn-primary" type="submit" disabled={isSubmitting}>
+                    {isSubmitting ? "Сохраняем..." : "Сохранить"}
+                  </button>
+                </div>
+              </form>
             </div>
           )}
         </div>
