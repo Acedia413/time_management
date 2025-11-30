@@ -14,6 +14,14 @@ export type TaskResponse = {
   group: { id: number; name: string } | null;
   createdBy: { id: number; fullName: string };
 };
+// Ответ для списка отправок по задаче
+export type SubmissionResponse = {
+  id: number;
+  content: string | null;
+  fileUrl: string | null;
+  submittedAt: Date;
+  student: { id: number; fullName: string };
+};
 
 @Injectable()
 export class TasksService {
@@ -112,6 +120,32 @@ export class TasksService {
         fullName: task.createdBy.fullName,
       },
     };
+  }
+  // Метод проверки доступа к задаче
+  async getSubmissionsForTask(
+    taskId: number,
+    userId: number,
+    roles: string[],
+  ): Promise<SubmissionResponse[]> {
+    // Проверяем, что задача видима пользователю
+    await this.findOneForUser(taskId, userId, roles);
+
+    const submissions = await this.prisma.submission.findMany({
+      where: { taskId },
+      include: { student: { select: { id: true, fullName: true } } },
+      orderBy: { submittedAt: 'desc' },
+    });
+
+    return submissions.map((submission) => ({
+      id: submission.id,
+      content: submission.content ?? null,
+      fileUrl: submission.fileUrl ?? null,
+      submittedAt: submission.submittedAt,
+      student: {
+        id: submission.student.id,
+        fullName: submission.student.fullName,
+      },
+    }));
   }
 // Обработка POST /tasks
   async createTask(

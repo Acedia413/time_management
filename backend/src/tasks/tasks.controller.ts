@@ -90,4 +90,17 @@ export class TasksController {
     }
     return this.tasksService.deleteTask(id, userId, roles);
   }
+  // Получить отправки по задаче
+  @Get(':id/submissions')
+  findSubmissions(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    const userId = req.user?.sub;
+    const roles = req.user?.roles ?? [];
+    if (!userId) {
+      throw new UnauthorizedException();
+    }
+    return this.tasksService.getSubmissionsForTask(id, userId, roles);
+  }
 }
