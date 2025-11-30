@@ -116,7 +116,6 @@ const Sidebar: React.FC<SidebarProps> = ({
           className="user-card"
           style={{ position: "relative", cursor: "pointer" }}
           onClick={() => setShowMenu((prev) => !prev)}
-          onMouseLeave={() => setShowMenu(false)}
         >
           <div className="user-info">
             <div
@@ -162,7 +161,6 @@ const Sidebar: React.FC<SidebarProps> = ({
                 }}
                 onClick={(e) => {
                   e.stopPropagation();
-                  setShowMenu(false);
                   navigate("settings");
                 }}
               >
