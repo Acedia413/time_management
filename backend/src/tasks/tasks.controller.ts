@@ -8,8 +8,10 @@ import {
   Patch,
   Post,
   Req,
+  UploadedFile,
   UnauthorizedException,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { TasksService, TaskResponse } from './tasks.service';
@@ -17,6 +19,9 @@ import { CreateTaskDto } from './dto/create-task.dto';
 import { Request } from 'express';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { CreateSubmissionDto } from './dto/create-submission.dto';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { extname } from 'path';
 // Интерфейс для аутентифицированного запроса
 type AuthenticatedRequest = Request & {
   user?: { sub: number; roles?: string[] };
@@ -117,5 +122,35 @@ export class TasksController {
       throw new UnauthorizedException();
     }
     return this.tasksService.createSubmission(id, userId, roles, dto);
+  }
+  // Создает отправку с файлом
+  @Post(':id/submissions/upload')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: diskStorage({
+        destination: './uploads',
+        filename: (_req, file, cb) => {
+          const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+          const ext = extname(file.originalname);
+          cb(null, `${uniqueSuffix}${ext}`);
+        },
+      }),
+    }),
+  )
+  uploadSubmission(
+    @Param('id', ParseIntPipe) id: number,
+    @UploadedFile() file: Express.Multer.File,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    const userId = req.user?.sub;
+    const roles = req.user?.roles ?? [];
+    if (!userId) {
+      throw new UnauthorizedException();
+    }
+    const fileUrl = file ? `/uploads/${file.filename}` : null;
+    return this.tasksService.createSubmission(id, userId, roles, {
+      content: null,
+      fileUrl,
+    });
   }
 }
