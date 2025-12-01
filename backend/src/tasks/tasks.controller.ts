@@ -139,7 +139,7 @@ export class TasksController {
   )
   uploadSubmission(
     @Param('id', ParseIntPipe) id: number,
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFile() file: any,
     @Req() req: AuthenticatedRequest,
   ) {
     const userId = req.user?.sub;
@@ -152,5 +152,19 @@ export class TasksController {
       content: null,
       fileUrl,
     });
+  }
+  // Удаляет отправку
+  @Delete(':taskId/submissions/:submissionId')
+  deleteSubmission(
+    @Param('taskId', ParseIntPipe) taskId: number,
+    @Param('submissionId', ParseIntPipe) submissionId: number,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    const userId = req.user?.sub;
+    const roles = req.user?.roles ?? [];
+    if (!userId) {
+      throw new UnauthorizedException();
+    }
+    return this.tasksService.deleteSubmission(taskId, submissionId, userId, roles);
   }
 }

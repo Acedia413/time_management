@@ -1,9 +1,15 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../prisma.service';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { RoleName, TaskStatus } from '@prisma/client';
+import * as fs from 'fs';
+import * as path from 'path';
+import { PrismaService } from '../prisma.service';
+import { CreateSubmissionDto } from './dto/create-submission.dto';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
-import { CreateSubmissionDto } from './dto/create-submission.dto';
 
 export type TaskResponse = {
   id: number;
@@ -148,7 +154,7 @@ export class TasksService {
       },
     }));
   }
-// Метод создания отправки
+  // Метод создания отправки
   async createSubmission(
     taskId: number,
     userId: number,
@@ -184,7 +190,44 @@ export class TasksService {
       },
     };
   }
-// Обработка POST /tasks
+
+  async deleteSubmission(
+    taskId: number,
+    submissionId: number,
+    userId: number,
+    roles: string[],
+  ): Promise<{ success: true }> {
+    const submission = await this.prisma.submission.findUnique({
+      where: { id: submissionId },
+    });
+
+    if (!submission || submission.taskId !== taskId) {
+      throw new NotFoundException('Отправка не найдена.');
+    }
+
+    const normalizedRoles = roles.map((r) => r.toUpperCase()) as RoleName[];
+    const isAdminOrTeacher = normalizedRoles.some(
+      (r) => r === RoleName.ADMIN || r === RoleName.TEACHER,
+    );
+    const isOwner = submission.studentId === userId;
+
+    if (!isOwner && !isAdminOrTeacher) {
+      throw new ForbiddenException('Недостаточно прав для удаления отправки.');
+    }
+
+    if (submission.fileUrl) {
+      const filePath = path.join(process.cwd(), submission.fileUrl);
+      try {
+        await fs.promises.unlink(filePath);
+      } catch (err) {
+        console.error('Ошибка удаления файла:', err);
+      }
+    }
+
+    await this.prisma.submission.delete({ where: { id: submissionId } });
+    return { success: true as const };
+  }
+  // Обработка POST /tasks
   async createTask(
     dto: CreateTaskDto,
     userId: number,
