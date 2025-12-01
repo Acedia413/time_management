@@ -40,9 +40,14 @@ export default function TaskDetailPage() {
   const [task, setTask] = useState<TaskItem | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submissions, setSubmissions] = useState<SubmissionItem[]>([]);
-  const [form, setForm] = useState<{ content: string; fileUrl: string }>({
+  const [form, setForm] = useState<{
+    content: string;
+    fileUrl: string;
+    file?: File | null;
+  }>({
     content: "",
     fileUrl: "",
+    file: null,
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -74,7 +79,7 @@ export default function TaskDetailPage() {
           `${apiUrl}/tasks/${params?.id}/submissions`,
           {
             headers: { Authorization: `Bearer ${token}` },
-          },
+          }
         );
         if (submissionsResponse.ok) {
           const subs = (await submissionsResponse.json()) as SubmissionItem[];
@@ -90,13 +95,43 @@ export default function TaskDetailPage() {
     load();
   }, [router, apiUrl, params?.id]);
 
+  const handleDelete = async (submissionId: number) => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      setError("Требуется авторизация");
+      return;
+    }
+    try {
+      const response = await fetch(
+        `${apiUrl}/tasks/${params?.id}/submissions/${submissionId}`,
+        {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      if (!response.ok) {
+        const details = await response.json().catch(() => null);
+        const message =
+          (Array.isArray(details?.message)
+            ? details.message[0]
+            : details?.message) ?? "Не удалось удалить отправку.";
+        throw new Error(message);
+      }
+      setSubmissions((prev) => prev.filter((s) => s.id !== submissionId));
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Ошибка удаления отправки."
+      );
+    }
+  };
+
   const breadcrumb = useMemo(() => {
     const base =
       from === "my"
         ? { label: "Мои задачи", href: "/tasks/my" }
         : from === "teacher"
-          ? { label: "Задачи преподавателей", href: "/tasks/teacher" }
-          : { label: "Задачи", href: "/tasks" };
+        ? { label: "Задачи преподавателей", href: "/tasks/teacher" }
+        : { label: "Задачи", href: "/tasks" };
     return base;
   }, [from]);
 
@@ -120,7 +155,9 @@ export default function TaskDetailPage() {
         <Header currentView="tasks" currentRole={currentRole} user={user} />
         <div id="contentArea">
           <div style={{ marginBottom: 12 }}>
-            <Link href="/" style={{ marginRight: 8 }}>Главная</Link>
+            <Link href="/" style={{ marginRight: 8 }}>
+              Главная
+            </Link>
             <span style={{ marginRight: 8 }}>/</span>
             <Link href={breadcrumb.href} style={{ marginRight: 8 }}>
               {breadcrumb.label}
@@ -189,17 +226,39 @@ export default function TaskDetailPage() {
                       )}
                     </div>
                     {sub.fileUrl ? (
-                      <a
-                        href={sub.fileUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="btn"
-                        style={{ border: "1px solid var(--border)" }}
-                      >
-                        Скачать
-                      </a>
+                      (() => {
+                        const link = sub.fileUrl?.startsWith("http")
+                          ? sub.fileUrl
+                          : `${apiUrl}${sub.fileUrl ?? ""}`;
+                        return (
+                          <a
+                            href={link}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="btn"
+                            style={{ border: "1px solid var(--border)" }}
+                          >
+                            Скачать
+                          </a>
+                        );
+                      })()
                     ) : (
-                      <span style={{ color: "var(--text-muted)" }}>Файл не приложен</span>
+                      <span style={{ color: "var(--text-muted)" }}>
+                        Файл не приложен
+                      </span>
+                    )}
+                    {((currentRole === "student" &&
+                      user &&
+                      sub.student?.id === user.id) ||
+                      currentRole === "teacher" ||
+                      currentRole === "admin") && (
+                      <button
+                        className="btn"
+                        style={{ color: "var(--danger)" }}
+                        onClick={() => handleDelete(sub.id)}
+                      >
+                        Удалить
+                      </button>
                     )}
                   </div>
                 ))}
@@ -220,6 +279,45 @@ export default function TaskDetailPage() {
                   }
                   setIsSubmitting(true);
                   try {
+                    if (form.file && !form.fileUrl.trim()) {
+                      const formData = new FormData();
+                      formData.append("file", form.file);
+                      const uploadResponse = await fetch(
+                        `${apiUrl}/tasks/${params?.id}/submissions/upload`,
+                        {
+                          method: "POST",
+                          headers: {
+                            Authorization: `Bearer ${token}`,
+                          },
+                          body: formData,
+                        }
+                      );
+                      if (!uploadResponse.ok) {
+                        const details = await uploadResponse
+                          .json()
+                          .catch(() => null);
+                        const message =
+                          (Array.isArray(details?.message)
+                            ? details.message[0]
+                            : details?.message) ?? "Не удалось загрузить файл.";
+                        throw new Error(message);
+                      }
+                      const saved =
+                        (await uploadResponse.json()) as SubmissionItem;
+                      setSubmissions((prev) => {
+                        const exists = prev.some((s) => s.id === saved.id);
+                        if (exists) {
+                          return prev.map((s) =>
+                            s.id === saved.id ? saved : s
+                          );
+                        }
+                        return [saved, ...prev];
+                      });
+                      setForm({ content: "", fileUrl: "", file: null });
+                      setIsSubmitting(false);
+                      return;
+                    }
+
                     const payload: { content?: string; fileUrl?: string } = {};
                     if (form.content.trim()) {
                       payload.content = form.content.trim();
@@ -239,7 +337,7 @@ export default function TaskDetailPage() {
                           Authorization: `Bearer ${token}`,
                         },
                         body: JSON.stringify(payload),
-                      },
+                      }
                     );
                     if (!response.ok) {
                       const details = await response.json().catch(() => null);
@@ -257,7 +355,7 @@ export default function TaskDetailPage() {
                       }
                       return [saved, ...prev];
                     });
-                    setForm({ content: "", fileUrl: "" });
+                    setForm({ content: "", fileUrl: "", file: null });
                   } catch (err) {
                     setFormError(
                       err instanceof Error ? err.message : "Ошибка сохранения."
@@ -268,7 +366,10 @@ export default function TaskDetailPage() {
                 }}
                 style={{ display: "flex", flexDirection: "column", gap: 10 }}
               >
-                <label className="form-group" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <label
+                  className="form-group"
+                  style={{ display: "flex", flexDirection: "column", gap: 6 }}
+                >
                   <span>Описание (опционально)</span>
                   <input
                     type="text"
@@ -279,22 +380,49 @@ export default function TaskDetailPage() {
                     placeholder="Краткое описание отправки"
                   />
                 </label>
-                <label className="form-group" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <label
+                  className="form-group"
+                  style={{ display: "flex", flexDirection: "column", gap: 6 }}
+                >
                   <span>Ссылка на файл</span>
                   <input
                     type="text"
                     value={form.fileUrl}
                     onChange={(e) =>
-                      setForm((prev) => ({ ...prev, fileUrl: e.target.value }))
+                      setForm((prev) => ({
+                        ...prev,
+                        fileUrl: e.target.value,
+                        file: null,
+                      }))
                     }
                     placeholder="https://..."
+                  />
+                </label>
+                <label
+                  className="form-group"
+                  style={{ display: "flex", flexDirection: "column", gap: 6 }}
+                >
+                  <span>Загрузить файл</span>
+                  <input
+                    type="file"
+                    onChange={(e) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        file: e.target.files?.[0] ?? null,
+                        fileUrl: "",
+                      }))
+                    }
                   />
                 </label>
                 {formError && (
                   <div style={{ color: "var(--danger)" }}>{formError}</div>
                 )}
                 <div>
-                  <button className="btn btn-primary" type="submit" disabled={isSubmitting}>
+                  <button
+                    className="btn btn-primary"
+                    type="submit"
+                    disabled={isSubmitting}
+                  >
                     {isSubmitting ? "Сохраняем..." : "Сохранить"}
                   </button>
                 </div>
