@@ -4,6 +4,4 @@
 node_modules
 yarn-error.log
 **/*.md
-
-
-docker run --hostname=ed9247e97438 --env=POSTGRES_PASSWORD=password --env=POSTGRES_DB=unitask --env=POSTGRES_USER=postgres --env=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin --env=GOSU_VERSION=1.19 --env=LANG=en_US.utf8 --env=PG_MAJOR=15 --env=PG_VERSION=15.15 --env=PG_SHA256=5753aaeb8b09cbf61016f78aa69bf5cbdf01b43263f010cbf168c82896213aaa --env=DOCKER_PG_LLVM_DEPS=llvm19-dev 		clang19 --env=PGDATA=/var/lib/postgresql/data --volume=code_postgres_data:/var/lib/postgresql/data:rw --volume=/var/lib/postgresql/data --network=code_default --workdir=/ -p 5432:5432 --restart=always --label='com.docker.compose.config-hash=212290f73b4ce16f55cd6e7fefb7f16d6fc0e6e6b8f278fb971b32f55d417052' --label='com.docker.compose.container-number=1' --label='com.docker.compose.depends_on=' --label='com.docker.compose.image=sha256:aa7b1ef595e165f0b780162e3a41edd0a7ed3ea672eb8a0f81615ba725e62bc5' --label='com.docker.compose.oneoff=False' --label='com.docker.compose.project=code' --label='com.docker.compose.project.config_files=C:\Users\tembe\OneDrive\Desktop\Практика ВКР\code\docker-compose.yml' --label='com.docker.compose.project.working_dir=C:\Users\tembe\OneDrive\Desktop\Практика ВКР\code' --label='com.docker.compose.service=db' --label='com.docker.compose.version=2.40.3' --runtime=runc -d postgres:15-alpine
+backend/uploads/
