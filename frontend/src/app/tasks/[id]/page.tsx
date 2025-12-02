@@ -28,6 +28,7 @@ type SubmissionItem = {
 const statusLabels: Record<string, string> = {
   DRAFT: "Черновик",
   ACTIVE: "В работе",
+  IN_REVIEW: "В проверке",
   CLOSED: "Закрыта",
 };
 

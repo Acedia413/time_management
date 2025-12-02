@@ -13,7 +13,7 @@ type TaskItem = {
   id: number;
   title: string;
   description: string;
-  status: "DRAFT" | "ACTIVE" | "CLOSED" | string;
+  status: "DRAFT" | "ACTIVE" | "IN_REVIEW" | "CLOSED" | string;
   dueDate: string | null;
   createdBy: { id: number; fullName: string };
   group: { id: number; name: string } | null;
@@ -23,19 +23,21 @@ type TaskForm = {
   title: string;
   description: string;
   dueDate: string;
-  status: "DRAFT" | "ACTIVE" | "CLOSED";
+  status: "DRAFT" | "ACTIVE" | "IN_REVIEW" | "CLOSED";
   groupId: string;
 };
 // Подписи и стили для статусов задач
 const statusLabels: Record<string, string> = {
   DRAFT: "Черновик",
   ACTIVE: "В работе",
+  IN_REVIEW: "В проверке",
   CLOSED: "Закрыта",
 };
 
 const statusClass: Record<string, string> = {
   DRAFT: "badge-new",
   ACTIVE: "badge-progress",
+  IN_REVIEW: "badge-review",
   CLOSED: "badge-done",
 };
 // Загружаю задачи с учетом токена и подготавливаю данные для отображения
@@ -108,8 +110,9 @@ const TaskList: React.FC<TaskListProps> = ({ currentRole, currentUserId, mode = 
     const total = viewTasks.length;
     const draft = viewTasks.filter((task) => task.status === "DRAFT").length;
     const active = viewTasks.filter((task) => task.status === "ACTIVE").length;
+    const inReview = viewTasks.filter((task) => task.status === "IN_REVIEW").length;
     const closed = viewTasks.filter((task) => task.status === "CLOSED").length;
-    return { total, draft, active, closed };
+    return { total, draft, active, inReview, closed };
   }, [viewTasks]);
 
   useEffect(() => {
@@ -139,7 +142,10 @@ const TaskList: React.FC<TaskListProps> = ({ currentRole, currentUserId, mode = 
   }
 // Если пользователь имеет права на создание задач, отображаю форму создания
 // Исключительные ситуации обработаны
-  const handleClose = async (taskId: number) => {
+  const handleStatusChange = async (
+    taskId: number,
+    status: TaskForm["status"],
+  ) => {
     setActionError(null);
     const token = localStorage.getItem("token");
     if (!token) {
@@ -148,13 +154,13 @@ const TaskList: React.FC<TaskListProps> = ({ currentRole, currentUserId, mode = 
     }
     setActionLoading(taskId);
     try {
-      const response = await fetch(`${apiUrl}/tasks/${taskId}`, {
+      const response = await fetch(`${apiUrl}/tasks/${taskId}/status`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ status: "CLOSED" }),
+        body: JSON.stringify({ status }),
       });
 
       if (!response.ok) {
@@ -174,7 +180,7 @@ const TaskList: React.FC<TaskListProps> = ({ currentRole, currentUserId, mode = 
       await fetchTasks();
     } catch (err) {
       setActionError(
-        err instanceof Error ? err.message : "Ошибка обновления задачи.",
+        err instanceof Error ? err.message : "Ошибка обновления статуса задачи.",
       );
     } finally {
       setActionLoading(null);
@@ -239,6 +245,9 @@ const TaskList: React.FC<TaskListProps> = ({ currentRole, currentUserId, mode = 
         </span>
         <span className="badge" style={{ background: "#ecfeff", color: "#0f766e" }}>
           В работе: {stats.active}
+        </span>
+        <span className="badge" style={{ background: "#fff1f2", color: "#be123c" }}>
+          В проверке: {stats.inReview}
         </span>
         <span className="badge" style={{ background: "#e5e7eb", color: "#374151" }}>
           Закрыты: {stats.closed}
@@ -377,6 +386,7 @@ const TaskList: React.FC<TaskListProps> = ({ currentRole, currentUserId, mode = 
               >
                 <option value="ACTIVE">В работе</option>
                 <option value="DRAFT">Черновик</option>
+                <option value="IN_REVIEW">В проверке</option>
                 <option value="CLOSED">Закрыта</option>
               </select>
             </label>
@@ -449,9 +459,19 @@ const TaskList: React.FC<TaskListProps> = ({ currentRole, currentUserId, mode = 
                       className="btn"
                       style={{ color: "var(--primary)" }}
                       disabled={actionLoading === task.id}
-                      onClick={() => handleClose(task.id)}
+                      onClick={() => handleStatusChange(task.id, "CLOSED")}
                     >
                       {actionLoading === task.id ? "Закрываем..." : "Закрыть"}
+                    </button>
+                  )}
+                  {task.status !== "IN_REVIEW" && task.status !== "CLOSED" && (
+                    <button
+                      className="btn"
+                      style={{ color: "var(--primary)" }}
+                      disabled={actionLoading === task.id}
+                      onClick={() => handleStatusChange(task.id, "IN_REVIEW")}
+                    >
+                      {actionLoading === task.id ? "Обновляем..." : "На проверке"}
                     </button>
                   )}
                   <button

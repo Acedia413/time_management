@@ -236,13 +236,17 @@ body {
   color: var(--primary);
 }
 .badge-progress {
-  background: #fff7ed;
-  color: var(--warning);
-}
+    background: #fff7ed;
+    color: var(--warning);
+  }
+.badge-review {
+    background: #fdf2f8;
+    color: #be185d;
+  }
 .badge-done {
-  background: #ecfdf5;
-  color: var(--success);
-}
+    background: #ecfdf5;
+    color: var(--success);
+  }
 
 
 .hidden {
