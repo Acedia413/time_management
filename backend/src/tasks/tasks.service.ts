@@ -77,6 +77,55 @@ export class TasksService {
     }));
   }
 
+  // Отдает задачи для студента
+  async findForStudent(
+    studentId: number,
+    teacherId: number,
+    roles: string[],
+  ): Promise<TaskResponse[]> {
+    const normalizedRoles = roles.map((r) => r.toUpperCase()) as RoleName[];
+    const isTeacherOrAdmin = normalizedRoles.some(
+      (r) => r === RoleName.TEACHER || r === RoleName.ADMIN,
+    );
+    if (!isTeacherOrAdmin) {
+      throw new ForbiddenException('Access denied');
+    }
+    const student = await this.prisma.user.findUnique({
+      where: { id: studentId },
+      select: { groupId: true },
+    });
+    if (!student) {
+      throw new NotFoundException('Student not found');
+    }
+    const tasks = await this.prisma.task.findMany({
+      where: {
+        createdById: teacherId,
+        OR: [
+          { groupId: null },
+          student.groupId !== null ? { groupId: student.groupId } : undefined,
+        ].filter(Boolean) as Record<string, unknown>[],
+      },
+      include: {
+        group: true,
+        createdBy: { select: { id: true, fullName: true } },
+      },
+      orderBy: [{ dueDate: 'asc' }, { createdAt: 'desc' }],
+    });
+    return tasks.map((task) => ({
+      id: task.id,
+      title: task.title,
+      description: task.description,
+      status: task.status,
+      createdAt: task.createdAt,
+      dueDate: task.dueDate ?? null,
+      group: task.group ? { id: task.group.id, name: task.group.name } : null,
+      createdBy: {
+        id: task.createdBy.id,
+        fullName: task.createdBy.fullName,
+      },
+    }));
+  }
+
   // Обработка GET /tasks/:id с проверкой доступа для студента
   async findOneForUser(
     taskId: number,

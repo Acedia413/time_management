@@ -42,6 +42,19 @@ export class TasksController {
     }
     return this.tasksService.findAllForUser(userId, roles);
   }
+  // Отдает задачи для студента
+  @Get('student/:id')
+  findForStudent(
+    @Param('id', ParseIntPipe) studentId: number,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<TaskResponse[]> {
+    const userId = req.user?.sub;
+    const roles = req.user?.roles ?? [];
+    if (!userId) {
+      throw new UnauthorizedException();
+    }
+    return this.tasksService.findForStudent(studentId, userId, roles);
+  }
   // Отдает конкретную задачу, чтобы не подгружать лишние данные
   @Get(':id')
   findOne(
