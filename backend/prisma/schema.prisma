@@ -25,6 +25,7 @@ enum PermissionAction {
 enum TaskStatus {
   DRAFT
   ACTIVE
+  IN_REVIEW
   CLOSED
 }
 
