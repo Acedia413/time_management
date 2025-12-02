@@ -340,6 +340,16 @@ export class TasksService {
       },
     };
   }
+  // Обновление статуса задачи
+  async updateTaskStatus(
+    taskId: number,
+    status: TaskStatus,
+    userId: number,
+    roles: string[],
+  ): Promise<TaskResponse> {
+    return this.updateTask(taskId, { status }, userId, roles);
+  }
+
   // Обработка DELETE /tasks/:id
   async deleteTask(
     taskId: number,

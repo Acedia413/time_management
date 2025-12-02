@@ -22,6 +22,7 @@ import { CreateSubmissionDto } from './dto/create-submission.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
+import { UpdateTaskStatusDto } from './dto/update-task-status.dto';
 // Интерфейс для аутентифицированного запроса
 type AuthenticatedRequest = Request & {
   user?: { sub: number; roles?: string[] };
@@ -81,6 +82,20 @@ export class TasksController {
       throw new UnauthorizedException();
     }
     return this.tasksService.updateTask(id, dto, userId, roles);
+  }
+  // Обновляет статус задачи
+  @Patch(':id/status')
+  updateStatus(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateTaskStatusDto,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<TaskResponse> {
+    const userId = req.user?.sub;
+    const roles = req.user?.roles ?? [];
+    if (!userId) {
+      throw new UnauthorizedException();
+    }
+    return this.tasksService.updateTaskStatus(id, dto.status, userId, roles);
   }
 
   // Удаляет задачу
