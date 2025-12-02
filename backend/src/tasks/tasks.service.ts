@@ -110,12 +110,14 @@ export class TasksService {
     if (!student) {
       throw new NotFoundException('Student not found');
     }
+    // Получаем id группы студента
+    const studentGroupId = student.group?.id ?? null;
     const tasks = await this.prisma.task.findMany({
       where: {
         createdById: teacherId,
         OR: [
           { groupId: null },
-          student.groupId !== null ? { groupId: student.groupId } : undefined,
+          studentGroupId !== null ? { groupId: studentGroupId } : undefined,
         ].filter(Boolean) as Record<string, unknown>[],
       },
       include: {
