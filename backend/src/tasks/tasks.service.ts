@@ -21,6 +21,15 @@ export type TaskResponse = {
   group: { id: number; name: string } | null;
   createdBy: { id: number; fullName: string };
 };
+// Ответ для списка задач по студенту
+export type StudentTasksResponse = {
+  student: {
+    id: number;
+    fullName: string;
+    group: { id: number; name: string } | null;
+  };
+  tasks: TaskResponse[];
+};
 // Ответ для списка отправок по задаче
 export type SubmissionResponse = {
   id: number;
@@ -82,7 +91,7 @@ export class TasksService {
     studentId: number,
     teacherId: number,
     roles: string[],
-  ): Promise<TaskResponse[]> {
+  ): Promise<StudentTasksResponse> {
     const normalizedRoles = roles.map((r) => r.toUpperCase()) as RoleName[];
     const isTeacherOrAdmin = normalizedRoles.some(
       (r) => r === RoleName.TEACHER || r === RoleName.ADMIN,
@@ -92,7 +101,11 @@ export class TasksService {
     }
     const student = await this.prisma.user.findUnique({
       where: { id: studentId },
-      select: { groupId: true },
+      select: {
+        id: true,
+        fullName: true,
+        group: { select: { id: true, name: true } },
+      },
     });
     if (!student) {
       throw new NotFoundException('Student not found');
@@ -111,19 +124,28 @@ export class TasksService {
       },
       orderBy: [{ dueDate: 'asc' }, { createdAt: 'desc' }],
     });
-    return tasks.map((task) => ({
-      id: task.id,
-      title: task.title,
-      description: task.description,
-      status: task.status,
-      createdAt: task.createdAt,
-      dueDate: task.dueDate ?? null,
-      group: task.group ? { id: task.group.id, name: task.group.name } : null,
-      createdBy: {
-        id: task.createdBy.id,
-        fullName: task.createdBy.fullName,
+    return {
+      student: {
+        id: student.id,
+        fullName: student.fullName,
+        group: student.group
+          ? { id: student.group.id, name: student.group.name }
+          : null,
       },
-    }));
+      tasks: tasks.map((task) => ({
+        id: task.id,
+        title: task.title,
+        description: task.description,
+        status: task.status,
+        createdAt: task.createdAt,
+        dueDate: task.dueDate ?? null,
+        group: task.group ? { id: task.group.id, name: task.group.name } : null,
+        createdBy: {
+          id: task.createdBy.id,
+          fullName: task.createdBy.fullName,
+        },
+      })),
+    };
   }
 
   // Обработка GET /tasks/:id с проверкой доступа для студента

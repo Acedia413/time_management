@@ -47,7 +47,7 @@ export class TasksController {
   findForStudent(
     @Param('id', ParseIntPipe) studentId: number,
     @Req() req: AuthenticatedRequest,
-  ): Promise<TaskResponse[]> {
+  ) {
     const userId = req.user?.sub;
     const roles = req.user?.roles ?? [];
     if (!userId) {
