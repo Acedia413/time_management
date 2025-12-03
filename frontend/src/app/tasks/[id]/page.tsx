@@ -57,6 +57,8 @@ export default function TaskDetailPage() {
     process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
   const from = searchParams.get("from") ?? "all";
+  const teacherGroupName = searchParams.get("groupName");
+  const teacherStudentName = searchParams.get("studentName");
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -126,15 +128,40 @@ export default function TaskDetailPage() {
     }
   };
 
-  const breadcrumb = useMemo(() => {
+  const groupParam = searchParams.get("groupId");
+  const studentParam = searchParams.get("studentId");
+
+  const breadcrumbs = useMemo(() => {
+    const items: { label: string; href?: string }[] = [
+      { label: "Главная", href: "/" },
+    ];
     const base =
       from === "my"
         ? { label: "Мои задачи", href: "/tasks/my" }
         : from === "teacher"
         ? { label: "Задачи преподавателей", href: "/tasks/teacher" }
         : { label: "Задачи", href: "/tasks" };
-    return base;
-  }, [from]);
+    items.push(base);
+    if (from === "teacher") {
+      if (teacherGroupName) {
+        const groupHref = groupParam
+          ? `/tasks/teacher?groupId=${encodeURIComponent(groupParam)}`
+          : "/tasks/teacher";
+        items.push({ label: `Группа ${teacherGroupName}`, href: groupHref });
+      }
+      if (teacherStudentName) {
+        items.push({ label: `Студент ${teacherStudentName}` });
+      }
+    }
+    items.push({ label: task?.title ?? "Задача" });
+    return items;
+  }, [
+    from,
+    task?.title,
+    teacherGroupName,
+    teacherStudentName,
+    groupParam,
+  ]);
 
   return (
     <div style={{ minHeight: "100vh" }}>
@@ -156,16 +183,39 @@ export default function TaskDetailPage() {
         <Header currentView="tasks" currentRole={currentRole} user={user} />
         <div id="contentArea">
           <div style={{ marginBottom: 12 }}>
-            <Link href="/" style={{ marginRight: 8 }}>
-              Главная
-            </Link>
-            <span style={{ marginRight: 8 }}>/</span>
-            <Link href={breadcrumb.href} style={{ marginRight: 8 }}>
-              {breadcrumb.label}
-            </Link>
-            <span style={{ marginRight: 8 }}>/</span>
-            <span>{task?.title ?? "Задача"}</span>
+            {breadcrumbs.map((item, index) => (
+              <span key={`${item.label}-${index}`}>
+                {index > 0 && <span style={{ marginRight: 8 }}>/</span>}
+                {item.href ? (
+                  <Link href={item.href} style={{ marginRight: 8 }}>
+                    {item.label}
+                  </Link>
+                ) : (
+                  <span style={{ marginRight: 8 }}>{item.label}</span>
+                )}
+              </span>
+            ))}
           </div>
+          {from === "teacher" && (teacherGroupName || teacherStudentName) && (
+            <div className="card" style={{ marginBottom: 12 }}>
+              <h4 style={{ marginTop: 0, marginBottom: 8 }}>Контекст студента</h4>
+              {teacherGroupName && (
+                <p style={{ margin: 0, color: "var(--text-muted)" }}>
+                  Группа: <strong>{teacherGroupName}</strong>
+                </p>
+              )}
+              {teacherStudentName && (
+                <p style={{ margin: 0, color: "var(--text-muted)" }}>
+                  Студент: <strong>{teacherStudentName}</strong>
+                </p>
+              )}
+              <div style={{ marginTop: 8 }}>
+                <button className="btn" onClick={() => router.push("/tasks/teacher")}>
+                  Вернуться к задачам преподавателя
+                </button>
+              </div>
+            </div>
+          )}
           {error && (
             <div style={{ color: "var(--danger)", marginBottom: 12 }}>
               {error}

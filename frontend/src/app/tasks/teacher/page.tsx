@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Header from "../../../components/Header";
 import Sidebar from "../../../components/Sidebar";
 import { useProfile } from "../../../components/ProfileProvider";
@@ -25,6 +25,7 @@ export default function TasksTeacherPage() {
   const { user, role: profileRole } = useProfile();
   const currentRole = profileRole ?? "student";
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [groups, setGroups] = useState<TeacherGroup[]>([]);
   const [groupsLoading, setGroupsLoading] = useState(true);
   const [groupsError, setGroupsError] = useState<string | null>(null);
@@ -36,6 +37,7 @@ export default function TasksTeacherPage() {
   const [studentTasksError, setStudentTasksError] = useState<string | null>(null);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+  const initialGroupParam = searchParams.get("groupId");
   // Сброс выбора
   const resetSelection = useCallback(() => {
     setSelectedGroupId(null);
@@ -78,7 +80,16 @@ export default function TasksTeacherPage() {
         const data = (await response.json()) as TeacherGroup[];
         setGroups(Array.isArray(data) ? data : []);
         if (Array.isArray(data) && data.length > 0) {
-          setSelectedGroupId(data[0].group.id);
+          const requestedGroupId = initialGroupParam ? Number(initialGroupParam) : null;
+          if (
+            requestedGroupId &&
+            !Number.isNaN(requestedGroupId) &&
+            data.some((group) => group.group.id === requestedGroupId)
+          ) {
+            setSelectedGroupId(requestedGroupId);
+          } else {
+            setSelectedGroupId(data[0].group.id);
+          }
         }
       } catch (err) {
         setGroupsError(
@@ -89,7 +100,7 @@ export default function TasksTeacherPage() {
       }
     };
     load();
-  }, [apiUrl]);
+  }, [apiUrl, initialGroupParam]);
   // Выбранная группа
   const selectedGroup = useMemo(
     () => groups.find((group) => group.group.id === selectedGroupId) ?? null,
@@ -292,9 +303,23 @@ export default function TasksTeacherPage() {
                       </div>
                       <button
                         className="btn"
-                        onClick={() =>
-                          router.push(`/tasks/${task.id}?from=teacher&studentId=${selectedStudentId}`)
-                        }
+                        onClick={() => {
+                          const search = new URLSearchParams();
+                          search.set("from", "teacher");
+                          if (selectedGroupId) {
+                            search.set("groupId", String(selectedGroupId));
+                          }
+                          if (selectedGroup?.group.name) {
+                            search.set("groupName", selectedGroup.group.name);
+                          }
+                          if (selectedStudentId) {
+                            search.set("studentId", String(selectedStudentId));
+                          }
+                          if (selectedStudentName) {
+                            search.set("studentName", selectedStudentName);
+                          }
+                          router.push(`/tasks/${task.id}?${search.toString()}`);
+                        }}
                       >
                         Открыть
                       </button>
