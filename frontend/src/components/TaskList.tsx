@@ -15,7 +15,7 @@ type TaskItem = {
   description: string;
   status: "DRAFT" | "ACTIVE" | "IN_REVIEW" | "CLOSED" | string;
   dueDate: string | null;
-  createdBy: { id: number; fullName: string };
+  createdBy: { id: number; fullName: string; roles?: string[] };
   group: { id: number; name: string } | null;
 };
 
@@ -59,6 +59,10 @@ const TaskList: React.FC<TaskListProps> = ({ currentRole, currentUserId, mode = 
 
   const apiUrl =
     process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+  const isAdminTask = (task: TaskItem) =>
+    task.createdBy?.roles?.some(
+      (role) => role?.toUpperCase?.() === "ADMIN",
+    ) ?? false;
 // Загружаю задачи с учетом токена и подготавливаю данные для отображения
   const fetchTasks = useCallback(
     async (withLoader = false) => {
@@ -98,7 +102,19 @@ const TaskList: React.FC<TaskListProps> = ({ currentRole, currentUserId, mode = 
   );
   const viewTasks = useMemo(() => {
     if (mode === "my" && currentUserId) {
+      if (currentRole === "teacher") {
+        return tasks.filter(
+          (task) =>
+            task.createdBy?.id === currentUserId && task.status === "IN_REVIEW",
+        );
+      }
       return tasks.filter((task) => task.createdBy?.id === currentUserId);
+    }
+    if (currentRole === "teacher" && currentUserId) {
+      return tasks.filter(
+        (task) =>
+          task.createdBy?.id === currentUserId || isAdminTask(task),
+      );
     }
     if (mode === "teacher" && currentRole === "student" && currentUserId) {
       return tasks.filter((task) => task.createdBy?.id !== currentUserId);

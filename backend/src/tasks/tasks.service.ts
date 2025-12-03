@@ -19,7 +19,7 @@ export type TaskResponse = {
   createdAt: Date;
   dueDate: Date | null;
   group: { id: number; name: string } | null;
-  createdBy: { id: number; fullName: string };
+  createdBy: { id: number; fullName: string; roles: RoleName[] };
 };
 // Ответ для списка задач по студенту
 export type StudentTasksResponse = {
@@ -122,7 +122,13 @@ export class TasksService {
         : {},
       include: {
         group: true,
-        createdBy: { select: { id: true, fullName: true } },
+        createdBy: {
+          select: {
+            id: true,
+            fullName: true,
+            roles: { select: { name: true } },
+          },
+        },
       },
       orderBy: [{ dueDate: 'asc' }, { createdAt: 'desc' }],
     });
@@ -138,6 +144,7 @@ export class TasksService {
       createdBy: {
         id: task.createdBy.id,
         fullName: task.createdBy.fullName,
+        roles: task.createdBy.roles.map((role) => role.name),
       },
     }));
   }
@@ -178,7 +185,13 @@ export class TasksService {
       },
       include: {
         group: true,
-        createdBy: { select: { id: true, fullName: true } },
+        createdBy: {
+          select: {
+            id: true,
+            fullName: true,
+            roles: { select: { name: true } },
+          },
+        },
       },
       orderBy: [{ dueDate: 'asc' }, { createdAt: 'desc' }],
     });
@@ -201,6 +214,7 @@ export class TasksService {
         createdBy: {
           id: task.createdBy.id,
           fullName: task.createdBy.fullName,
+          roles: task.createdBy.roles.map((role) => role.name),
         },
       })),
     };
@@ -227,7 +241,13 @@ export class TasksService {
       where: { id: taskId },
       include: {
         group: true,
-        createdBy: { select: { id: true, fullName: true } },
+        createdBy: {
+          select: {
+            id: true,
+            fullName: true,
+            roles: { select: { name: true } },
+          },
+        },
       },
     });
 
@@ -254,6 +274,7 @@ export class TasksService {
       createdBy: {
         id: task.createdBy.id,
         fullName: task.createdBy.fullName,
+        roles: task.createdBy.roles.map((role) => role.name),
       },
     };
   }
@@ -384,7 +405,13 @@ export class TasksService {
       data,
       include: {
         group: true,
-        createdBy: { select: { id: true, fullName: true } },
+        createdBy: {
+          select: {
+            id: true,
+            fullName: true,
+            roles: { select: { name: true } },
+          },
+        },
       },
     });
 
@@ -401,6 +428,7 @@ export class TasksService {
       createdBy: {
         id: created.createdBy.id,
         fullName: created.createdBy.fullName,
+        roles: created.createdBy.roles.map((role) => role.name),
       },
     };
   }
@@ -449,7 +477,13 @@ export class TasksService {
       data,
       include: {
         group: true,
-        createdBy: { select: { id: true, fullName: true } },
+        createdBy: {
+          select: {
+            id: true,
+            fullName: true,
+            roles: { select: { name: true } },
+          },
+        },
       },
     });
 
@@ -466,6 +500,7 @@ export class TasksService {
       createdBy: {
         id: updated.createdBy.id,
         fullName: updated.createdBy.fullName,
+        roles: updated.createdBy.roles.map((role) => role.name),
       },
     };
   }
