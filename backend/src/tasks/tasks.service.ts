@@ -38,10 +38,66 @@ export type SubmissionResponse = {
   submittedAt: Date;
   student: { id: number; fullName: string };
 };
+// Ответ для списка групп по преподавателю
+export type TeacherGroupStudentsResponse = {
+  group: { id: number; name: string };
+  students: { id: number; fullName: string }[];
+};
 
 @Injectable()
 export class TasksService {
   constructor(private readonly prisma: PrismaService) {}
+
+  // Отдает список групп по преподавателю
+  async findGroupsForTeacher(
+    userId: number,
+    roles: string[],
+  ): Promise<TeacherGroupStudentsResponse[]> {
+    const normalizedRoles = roles.map((r) => r.toUpperCase()) as RoleName[];
+    const isTeacherOrAdmin = normalizedRoles.some(
+      (role) => role === RoleName.TEACHER || role === RoleName.ADMIN,
+    );
+
+    if (!isTeacherOrAdmin) {
+      throw new ForbiddenException('Access denied');
+    }
+
+    const groupRefs = await this.prisma.task.findMany({
+      where: { createdById: userId, groupId: { not: null } },
+      select: { groupId: true },
+    });
+
+    const groupIds = Array.from(
+      new Set(
+        groupRefs
+          .map((ref) => ref.groupId)
+          .filter((id): id is number => typeof id === 'number'),
+      ),
+    );
+
+    if (!groupIds.length) {
+      return [];
+    }
+
+    const groups = await this.prisma.group.findMany({
+      where: { id: { in: groupIds } },
+      include: {
+        students: {
+          select: { id: true, fullName: true },
+          orderBy: { fullName: 'asc' },
+        },
+      },
+      orderBy: { name: 'asc' },
+    });
+
+    return groups.map((group) => ({
+      group: { id: group.id, name: group.name },
+      students: group.students.map((student) => ({
+        id: student.id,
+        fullName: student.fullName,
+      })),
+    }));
+  }
   // Отдает все доступные пользователю задачи
   async findAllForUser(userId: number, roles: string[]): Promise<TaskResponse[]> {
     const isStudent = roles.map((r) => r.toUpperCase()).includes(RoleName.STUDENT);
