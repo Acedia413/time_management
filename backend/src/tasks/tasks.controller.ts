@@ -14,7 +14,11 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { TasksService, TaskResponse } from './tasks.service';
+import {
+  TasksService,
+  TaskResponse,
+  TeacherGroupStudentsResponse,
+} from './tasks.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { Request } from 'express';
 import { UpdateTaskDto } from './dto/update-task.dto';
@@ -32,6 +36,19 @@ type AuthenticatedRequest = Request & {
 @Controller('tasks')
 export class TasksController {
   constructor(private readonly tasksService: TasksService) {}
+
+  // Возвращет группы, к которым привязаны задачи преподавателя, вместе со студентами этих групп
+  @Get('teacher/groups')
+  findTeacherGroups(
+    @Req() req: AuthenticatedRequest,
+  ): Promise<TeacherGroupStudentsResponse[]> {
+    const userId = req.user?.sub;
+    const roles = req.user?.roles ?? [];
+    if (!userId) {
+      throw new UnauthorizedException();
+    }
+    return this.tasksService.findGroupsForTeacher(userId, roles);
+  }
 
   @Get()
   findAll(@Req() req: AuthenticatedRequest): Promise<TaskResponse[]> {
