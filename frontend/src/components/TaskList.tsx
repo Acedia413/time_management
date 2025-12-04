@@ -105,7 +105,7 @@ const TaskList: React.FC<TaskListProps> = ({ currentRole, currentUserId, mode = 
       if (currentRole === "teacher") {
         return tasks.filter(
           (task) =>
-            task.createdBy?.id === currentUserId && task.status === "IN_REVIEW",
+            task.createdBy?.id === currentUserId || task.status === "IN_REVIEW",
         );
       }
       return tasks.filter((task) => task.createdBy?.id === currentUserId);

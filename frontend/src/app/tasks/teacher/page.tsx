@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Header from "../../../components/Header";
 import Sidebar from "../../../components/Sidebar";
+import TaskList from "../../../components/TaskList";
 import { useProfile } from "../../../components/ProfileProvider";
 
 type TeacherGroup = {
@@ -26,6 +27,7 @@ export default function TasksTeacherPage() {
   const currentRole = profileRole ?? "student";
   const router = useRouter();
   const searchParams = useSearchParams();
+  const isTeacherView = currentRole === "teacher" || currentRole === "admin";
   const [groups, setGroups] = useState<TeacherGroup[]>([]);
   const [groupsLoading, setGroupsLoading] = useState(true);
   const [groupsError, setGroupsError] = useState<string | null>(null);
@@ -62,7 +64,12 @@ export default function TasksTeacherPage() {
     setSelectedStudentName(fullName);
   };
   // Загрузка групп преподавателя
-  useEffect(() => {
+  useEffect(() => { 
+    if (!isTeacherView) {
+      setGroupsLoading(false);
+      setGroupsError(null);
+      return;
+    }
     const token = localStorage.getItem("token");
     if (!token) {
       setGroupsError("Требуется авторизация");
@@ -100,7 +107,7 @@ export default function TasksTeacherPage() {
       }
     };
     load();
-  }, [apiUrl, initialGroupParam]);
+  }, [apiUrl, initialGroupParam, isTeacherView]);
   // Выбранная группа
   const selectedGroup = useMemo(
     () => groups.find((group) => group.group.id === selectedGroupId) ?? null,
@@ -216,6 +223,17 @@ export default function TasksTeacherPage() {
               </span>
             ))}
           </div>
+          {!isTeacherView ? (
+            <div className="card">
+              <h4 style={{ marginTop: 0, marginBottom: 12 }}>Задачи преподавателей</h4>
+              <TaskList
+                currentRole={currentRole}
+                currentUserId={user?.id}
+                mode="teacher"
+              />
+            </div>
+          ) : (
+            <>
           <div className="card">
             <h4 style={{ marginTop: 0, marginBottom: 12 }}>Группы преподавателя</h4>
             {groupsLoading && <p>Загружаем группы...</p>}
@@ -328,6 +346,8 @@ export default function TasksTeacherPage() {
                 </div>
               )}
             </div>
+          )}
+            </>
           )}
         </div>
       </main>
