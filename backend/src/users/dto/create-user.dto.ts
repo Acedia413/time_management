@@ -6,4 +6,6 @@ export class CreateUserDto {
   fullName: string;
   role: RoleName | string;
   groupId?: number;
+  departmentId?: number | null;
+  subjectIds?: number[];
 }

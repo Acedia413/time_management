@@ -7,12 +7,14 @@
   Param,
   ParseIntPipe,
   Post,
+  Put,
   Req,
   UseGuards,
 } from '@nestjs/common';
 import { UserResponse, UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
 import { Request } from 'express';
 
 type AuthenticatedRequest = Request & { user?: { roles?: string[] } };
@@ -40,6 +42,16 @@ export class UsersController {
   ): Promise<UserResponse> {
     this.ensureAdmin(req);
     return this.usersService.createUser(dto);
+  }
+  // Обновление записи пользователя
+  @Put(':id')
+  update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateUserDto,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<UserResponse> {
+    this.ensureAdmin(req);
+    return this.usersService.updateUser(id, dto);
   }
 
   // Удаление записи пользователя
