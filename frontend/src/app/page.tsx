@@ -8,6 +8,7 @@ import Journal from "../components/Journal";
 import Sidebar from "../components/Sidebar";
 import TaskList from "../components/TaskList";
 import UserList from "../components/UserList";
+import SettingsPanel from "../components/SettingsPanel";
 import { useProfile } from "../components/ProfileProvider";
 
 type UserProfile = {
@@ -118,11 +119,7 @@ export default function Home() {
       case "journal":
         return <Journal />;
       case "settings":
-        return (
-          <div className="card">
-            <p>Настройки в разработке...</p>
-          </div>
-        );
+        return <SettingsPanel />;
       default:
         return (
           <div className="card">
