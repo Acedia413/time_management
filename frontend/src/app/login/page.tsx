@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useProfile } from "../../components/ProfileProvider";
 
 export default function LoginPage() {
   const [username, setUsername] = useState("");
@@ -9,6 +10,7 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
+  const { refetch } = useProfile();
 
   const apiUrl =
     process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
@@ -37,6 +39,7 @@ export default function LoginPage() {
       localStorage.setItem("token", data.accessToken);
       localStorage.setItem("userRole", primaryRole);
 
+      await refetch();
       router.push("/");
     } catch {
       setError("Ошибка при авторизации. Попробуйте позже.");

@@ -38,6 +38,8 @@ const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ children }) 
   const loadProfile = async () => {
     const token = localStorage.getItem("token");
     if (!token) {
+      setUser(null);
+      setLoading(false);
       router.push("/login");
       return;
     }
@@ -52,6 +54,7 @@ const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ children }) 
       const profile = await response.json();
       setUser(profile.user ?? profile);
     } catch {
+      setUser(null);
       localStorage.removeItem("token");
       localStorage.removeItem("userRole");
       router.push("/login");
