@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 
 type UserListItem = {
   id: number;
@@ -35,8 +35,10 @@ const UserList: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [roleFilter, setRoleFilter] = useState<RoleFilter>("ALL");
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     const token = localStorage.getItem("token");
     if (!token) {
       setError("Требуется авторизация, войдите в систему.");
@@ -72,11 +74,50 @@ const UserList: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchUsers();
-  }, []);
+  }, [fetchUsers]);
+
+  const handleDelete = async (userId: number, fullName: string) => {
+    const confirmed = window.confirm(
+      `Удалить пользователя «${fullName}»? Действие нельзя отменить.`,
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    const token = localStorage.getItem("token");
+    if (!token) {
+      setActionError("Требуется авторизация, войдите в систему.");
+      return;
+    }
+
+    setDeletingId(userId);
+    setActionError(null);
+    try {
+      const response = await fetch(`${apiUrl}/users/${userId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) {
+        const details = await response.json().catch(() => null);
+        const message =
+          (Array.isArray(details?.message)
+            ? details.message[0]
+            : details?.message) ?? "Не удалось удалить пользователя.";
+        throw new Error(message);
+      }
+      await fetchUsers();
+    } catch (err) {
+      setActionError(
+        err instanceof Error ? err.message : "Не удалось удалить пользователя.",
+      );
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   const totals = useMemo(() => {
     const students = users.filter((user) =>
@@ -172,6 +213,9 @@ const UserList: React.FC = () => {
 
       {isLoading && <p>Данные загружаются...</p>}
       {!isLoading && error && <p style={{ color: "var(--danger)" }}>{error}</p>}
+      {actionError && (
+        <p style={{ color: "var(--danger)" }}>{actionError}</p>
+      )}
 
       {!isLoading && !error && (
         <>
@@ -205,13 +249,21 @@ const UserList: React.FC = () => {
                       </span>
                     </td>
                     <td>{user.relation}</td>
-                    <td>
+                    <td style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                       <button
                         className="btn"
                         style={{ padding: "6px 12px" }}
                         onClick={() => router.push(`/users/${user.id}/edit`)}
                       >
                         Изменить
+                      </button>
+                      <button
+                        className="btn btn-danger"
+                        style={{ padding: "6px 12px" }}
+                        onClick={() => handleDelete(user.id, user.fullName)}
+                        disabled={deletingId === user.id}
+                      >
+                        {deletingId === user.id ? "Удаляем..." : "Удалить"}
                       </button>
                     </td>
                   </tr>
