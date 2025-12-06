@@ -34,6 +34,15 @@ export class UsersController {
     return this.usersService.findStudentsAndTeachers();
   }
 
+  @Get(':id')
+  findOne(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<UserResponse> {
+    this.ensureAdmin(req);
+    return this.usersService.findOne(id);
+  }
+
   // Создание записи пользователя
   @Post()
   create(

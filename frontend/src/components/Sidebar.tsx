@@ -158,22 +158,6 @@ const Sidebar: React.FC<SidebarProps> = ({
                   background: "transparent",
                   border: "none",
                   cursor: "pointer",
-                }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  navigate("settings");
-                }}
-              >
-                Настройки профиля
-              </button>
-              <button
-                style={{
-                  width: "100%",
-                  textAlign: "left",
-                  padding: "10px 12px",
-                  background: "transparent",
-                  border: "none",
-                  cursor: "pointer",
                   color: "var(--danger)",
                 }}
                 onClick={(e) => {

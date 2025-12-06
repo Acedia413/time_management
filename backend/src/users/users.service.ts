@@ -1,4 +1,4 @@
-import {
+﻿import {
   BadRequestException,
   Injectable,
   NotFoundException,
@@ -54,6 +54,19 @@ export class UsersService {
     })) as UserWithRelations[];
 
     return users.map((user) => this.mapUser(user));
+  }
+  // Получение пользователя по ID
+  async findOne(id: number): Promise<UserResponse> {
+    const user = (await this.prisma.user.findUnique({
+      where: { id },
+      include: this.userInclude,
+    })) as UserWithRelations | null;
+
+    if (!user) {
+      throw new NotFoundException('Пользователь не найден.');
+    }
+
+    return this.mapUser(user);
   }
 
   // Создание пользователя
