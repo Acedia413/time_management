@@ -15,6 +15,7 @@ type TaskItem = {
   dueDate: string | null;
   createdBy: { id: number; fullName: string };
   group: { id: number; name: string } | null;
+  subject: { id: number; name: string } | null;
 };
 
 type SubmissionItem = {
@@ -230,10 +231,15 @@ export default function TaskDetailPage() {
                     {task.group.name}
                   </span>
                 )}
+                {task.subject && (
+                  <span className="badge" style={{ background: "#e0f2fe", color: "#0369a1" }}>
+                    {task.subject.name}
+                  </span>
+                )}
               </div>
               <h3 style={{ marginTop: 0 }}>{task.title}</h3>
               <p style={{ color: "var(--text-muted)" }}>{task.description}</p>
-              <div style={{ display: "flex", gap: 16, color: "var(--text-muted)" }}>
+              <div style={{ display: "flex", gap: 16, color: "var(--text-muted)", flexWrap: "wrap" }}>
                 <span>
                   Автор: {task.createdBy?.fullName ?? "Неизвестно"}
                 </span>

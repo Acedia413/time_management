@@ -20,6 +20,7 @@ type TaskItem = {
   dueDate: string | null;
   createdAt: string;
   group: { id: number; name: string } | null;
+  subject?: { id: number; name: string } | null;
 };
 
 export default function TasksTeacherPage() {
@@ -312,6 +313,16 @@ export default function TasksTeacherPage() {
                       <div>
                         <h4 style={{ margin: "0 0 4px 0" }}>{task.title}</h4>
                         <p style={{ margin: 0, color: "var(--text-muted)" }}>{task.description}</p>
+                        {task.group && (
+                          <p style={{ margin: 0, color: "var(--text-muted)", fontSize: "0.9rem" }}>
+                            Группа: <strong>{task.group.name}</strong>
+                          </p>
+                        )}
+                        {task.subject && (
+                          <p style={{ margin: 0, color: "var(--text-muted)", fontSize: "0.9rem" }}>
+                            Предмет: <strong>{task.subject.name}</strong>
+                          </p>
+                        )}
                         <p style={{ margin: 0, color: "var(--text-muted)", fontSize: "0.9rem" }}>
                           Срок:{" "}
                           {task.dueDate && !Number.isNaN(Date.parse(task.dueDate))

@@ -17,6 +17,7 @@ type TaskItem = {
   dueDate: string | null;
   createdBy: { id: number; fullName: string; roles?: string[] };
   group: { id: number; name: string } | null;
+  subject?: { id: number; name: string } | null;
 };
 
 type TaskForm = {
@@ -25,6 +26,12 @@ type TaskForm = {
   dueDate: string;
   status: "DRAFT" | "ACTIVE" | "IN_REVIEW" | "CLOSED";
   groupId: string;
+  subjectId: string;
+};
+
+type SubjectOption = {
+  id: number;
+  name: string;
 };
 // Подписи и стили для статусов задач
 const statusLabels: Record<string, string> = {
@@ -55,7 +62,11 @@ const TaskList: React.FC<TaskListProps> = ({ currentRole, currentUserId, mode = 
     dueDate: "",
     status: "ACTIVE",
     groupId: "",
+    subjectId: "",
   });
+  const [subjects, setSubjects] = useState<SubjectOption[]>([]);
+  const [subjectsLoading, setSubjectsLoading] = useState(false);
+  const [subjectsError, setSubjectsError] = useState<string | null>(null);
 
   const apiUrl =
     process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
@@ -135,6 +146,46 @@ const TaskList: React.FC<TaskListProps> = ({ currentRole, currentUserId, mode = 
     fetchTasks(true);
   }, [fetchTasks]);
 
+  useEffect(() => {
+    if (currentRole !== "teacher" && currentRole !== "admin") {
+      setSubjects([]);
+      setSubjectsError(null);
+      return;
+    }
+    const token = localStorage.getItem("token");
+    if (!token) {
+      setSubjectsError("Требуется авторизация. Перелогиньтесь.");
+      return;
+    }
+    setSubjectsLoading(true);
+    setSubjectsError(null);
+    const endpoint =
+      currentRole === "teacher"
+        ? `${apiUrl}/subjects/teacher/me`
+        : `${apiUrl}/subjects`;
+    fetch(endpoint, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error("Не удалось загрузить список предметов.");
+        }
+        const data = await response.json();
+        const normalized = Array.isArray(data)
+          ? [...data].sort((a, b) => a.name.localeCompare(b.name, "ru"))
+          : [];
+        setSubjects(normalized);
+      })
+      .catch((err) => {
+        setSubjectsError(
+          err instanceof Error ? err.message : "Ошибка загрузки предметов.",
+        );
+      })
+      .finally(() => {
+        setSubjectsLoading(false);
+      });
+  }, [apiUrl, currentRole]);
+
   const rows = useMemo(
     () =>
       viewTasks.map((task) => {
@@ -144,7 +195,8 @@ const TaskList: React.FC<TaskListProps> = ({ currentRole, currentUserId, mode = 
           task.dueDate && !Number.isNaN(Date.parse(task.dueDate))
             ? new Date(task.dueDate).toLocaleDateString("ru-RU")
             : "Без срока";
-        return { ...task, label, badgeClass, due };
+        const subjectName = task.subject?.name ?? null;
+        return { ...task, label, badgeClass, due, subjectName };
       }),
     [viewTasks],
   );
@@ -294,6 +346,7 @@ const TaskList: React.FC<TaskListProps> = ({ currentRole, currentUserId, mode = 
                 status: string;
                 dueDate?: string;
                 groupId?: number;
+                subjectId?: number;
               } = {
                 title: form.title.trim(),
                 description: form.description.trim(),
@@ -309,6 +362,13 @@ const TaskList: React.FC<TaskListProps> = ({ currentRole, currentUserId, mode = 
                   throw new Error("ID группы должно быть числом.");
                 }
                 payload.groupId = parsed;
+              }
+              if (form.subjectId.trim()) {
+                const parsedSubject = Number(form.subjectId);
+                if (Number.isNaN(parsedSubject)) {
+                  throw new Error("ID предмета должно быть числом.");
+                }
+                payload.subjectId = parsedSubject;
               }
 
               const response = await fetch(`${apiUrl}/tasks`, {
@@ -338,6 +398,7 @@ const TaskList: React.FC<TaskListProps> = ({ currentRole, currentUserId, mode = 
                 dueDate: "",
                 status: "ACTIVE",
                 groupId: "",
+                subjectId: "",
               });
               await fetchTasks();
             } catch (err) {
@@ -350,6 +411,9 @@ const TaskList: React.FC<TaskListProps> = ({ currentRole, currentUserId, mode = 
           }}
         >
           <h4 style={{ marginTop: 0, marginBottom: 12 }}>Создать задачу</h4>
+          {subjectsError && (
+            <p style={{ color: "var(--danger)", marginTop: 0 }}>{subjectsError}</p>
+          )}
           <div
             style={{
               display: "grid",
@@ -417,6 +481,37 @@ const TaskList: React.FC<TaskListProps> = ({ currentRole, currentUserId, mode = 
                 placeholder="Например, 1"
               />
             </label>
+            <label className="form-group" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <span>Предмет (опционально)</span>
+              <select
+                value={form.subjectId}
+                onChange={(e) =>
+                  setForm((prev) => ({ ...prev, subjectId: e.target.value }))
+                }
+                disabled={
+                  subjectsLoading ||
+                  (currentRole === "teacher" && subjects.length === 0)
+                }
+              >
+                <option value="">
+                  {subjects.length === 0
+                    ? currentRole === "teacher"
+                      ? "В вашем профиле нет предметов"
+                      : "Нет предметов"
+                    : "Не выбрано"}
+                </option>
+                {subjects.map((subject) => (
+                  <option key={subject.id} value={String(subject.id)}>
+                    {subject.name}
+                  </option>
+                ))}
+              </select>
+              {currentRole === "teacher" && !subjectsLoading && subjects.length === 0 && (
+                <span style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
+                  В вашей карточке не привязано ни одного предмета. Добавьте предметы в профиле, чтобы назначать их задачам.
+                </span>
+              )}
+            </label>
           </div>
           {formError && (
             <div style={{ color: "var(--danger)", marginTop: 8 }}>{formError}</div>
@@ -447,6 +542,14 @@ const TaskList: React.FC<TaskListProps> = ({ currentRole, currentUserId, mode = 
                     {task.group.name}
                   </span>
                 )}
+                {task.subject && (
+                  <span
+                    className="badge"
+                    style={{ background: "#e0f2fe", color: "#0369a1" }}
+                  >
+                    {task.subject.name}
+                  </span>
+                )}
               </div>
               <h4>{task.title}</h4>
               <p style={{ color: "var(--text-muted)" }}>
@@ -457,6 +560,9 @@ const TaskList: React.FC<TaskListProps> = ({ currentRole, currentUserId, mode = 
                 <span>
                   Автор: {task.createdBy?.fullName ?? "Неизвестно"}
                 </span>
+                {task.subject && (
+                  <span>Предмет: {task.subject.name}</span>
+                )}
               </div>
             </div>
               <div className="task-actions">
