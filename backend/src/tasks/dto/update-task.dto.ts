@@ -6,4 +6,5 @@ export class UpdateTaskDto {
   dueDate?: Date | string | null;
   status?: TaskStatus;
   groupId?: number | null;
+  subjectId?: number | null;
 }

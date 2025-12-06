@@ -27,6 +27,14 @@ export class SubjectsService {
     });
   }
 
+  async findForTeacher(teacherId: number): Promise<SubjectListItem[]> {
+    return this.prisma.subject.findMany({
+      where: { teachers: { some: { id: teacherId } } },
+      include: { department: { select: { id: true, name: true } } },
+      orderBy: { name: 'asc' },
+    });
+  }
+
   async create(dto: CreateSubjectDto): Promise<SubjectListItem> {
     const name = dto.name?.trim();
     const departmentId = Number(dto.departmentId);

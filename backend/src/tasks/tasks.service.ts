@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -19,6 +20,7 @@ export type TaskResponse = {
   createdAt: Date;
   dueDate: Date | null;
   group: { id: number; name: string } | null;
+  subject: { id: number; name: string } | null;
   createdBy: { id: number; fullName: string; roles: RoleName[] };
 };
 // Ответ для списка задач по студенту
@@ -44,9 +46,45 @@ export type TeacherGroupStudentsResponse = {
   students: { id: number; fullName: string }[];
 };
 
+type TaskWithRelations = {
+  id: number;
+  title: string;
+  description: string;
+  status: TaskStatus;
+  createdAt: Date;
+  dueDate: Date | null;
+  group: { id: number; name: string } | null;
+  subject: { id: number; name: string } | null;
+  createdBy: {
+    id: number;
+    fullName: string;
+    roles: { name: RoleName }[];
+  };
+};
+
 @Injectable()
 export class TasksService {
   constructor(private readonly prisma: PrismaService) {}
+
+  private mapTask(task: TaskWithRelations): TaskResponse {
+    return {
+      id: task.id,
+      title: task.title,
+      description: task.description,
+      status: task.status,
+      createdAt: task.createdAt,
+      dueDate: task.dueDate ?? null,
+      group: task.group ? { id: task.group.id, name: task.group.name } : null,
+      subject: task.subject
+        ? { id: task.subject.id, name: task.subject.name }
+        : null,
+      createdBy: {
+        id: task.createdBy.id,
+        fullName: task.createdBy.fullName,
+        roles: task.createdBy.roles.map((role) => role.name),
+      },
+    };
+  }
 
   // Отдает список групп по преподавателю
   async findGroupsForTeacher(
@@ -122,6 +160,7 @@ export class TasksService {
         : {},
       include: {
         group: true,
+        subject: { select: { id: true, name: true } },
         createdBy: {
           select: {
             id: true,
@@ -133,20 +172,7 @@ export class TasksService {
       orderBy: [{ dueDate: 'asc' }, { createdAt: 'desc' }],
     });
 
-    return tasks.map((task) => ({
-      id: task.id,
-      title: task.title,
-      description: task.description,
-      status: task.status,
-      createdAt: task.createdAt,
-      dueDate: task.dueDate ?? null,
-      group: task.group ? { id: task.group.id, name: task.group.name } : null,
-      createdBy: {
-        id: task.createdBy.id,
-        fullName: task.createdBy.fullName,
-        roles: task.createdBy.roles.map((role) => role.name),
-      },
-    }));
+    return tasks.map((task) => this.mapTask(task as TaskWithRelations));
   }
 
   // Отдает задачи для студента
@@ -185,6 +211,7 @@ export class TasksService {
       },
       include: {
         group: true,
+        subject: { select: { id: true, name: true } },
         createdBy: {
           select: {
             id: true,
@@ -203,20 +230,7 @@ export class TasksService {
           ? { id: student.group.id, name: student.group.name }
           : null,
       },
-      tasks: tasks.map((task) => ({
-        id: task.id,
-        title: task.title,
-        description: task.description,
-        status: task.status,
-        createdAt: task.createdAt,
-        dueDate: task.dueDate ?? null,
-        group: task.group ? { id: task.group.id, name: task.group.name } : null,
-        createdBy: {
-          id: task.createdBy.id,
-          fullName: task.createdBy.fullName,
-          roles: task.createdBy.roles.map((role) => role.name),
-        },
-      })),
+      tasks: tasks.map((task) => this.mapTask(task as TaskWithRelations)),
     };
   }
 
@@ -241,6 +255,7 @@ export class TasksService {
       where: { id: taskId },
       include: {
         group: true,
+        subject: { select: { id: true, name: true } },
         createdBy: {
           select: {
             id: true,
@@ -263,20 +278,7 @@ export class TasksService {
       }
     }
 
-    return {
-      id: task.id,
-      title: task.title,
-      description: task.description,
-      status: task.status,
-      createdAt: task.createdAt,
-      dueDate: task.dueDate ?? null,
-      group: task.group ? { id: task.group.id, name: task.group.name } : null,
-      createdBy: {
-        id: task.createdBy.id,
-        fullName: task.createdBy.fullName,
-        roles: task.createdBy.roles.map((role) => role.name),
-      },
-    };
+    return this.mapTask(task as TaskWithRelations);
   }
   // Метод проверки доступа к задаче
   async getSubmissionsForTask(
@@ -392,6 +394,18 @@ export class TasksService {
       throw new ForbiddenException('Недостаточно прав для создания задачи.');
     }
 
+    const subjectIdRaw =
+      typeof dto.subjectId === 'undefined' || dto.subjectId === null
+        ? null
+        : Number(dto.subjectId);
+    if (subjectIdRaw !== null) {
+      const isValidSubject =
+        Number.isInteger(subjectIdRaw) && subjectIdRaw > 0;
+      if (!isValidSubject) {
+        throw new BadRequestException('Некорректный идентификатор предмета.');
+      }
+    }
+
     const data = {
       title: dto.title,
       description: dto.description,
@@ -399,12 +413,14 @@ export class TasksService {
       dueDate: dto.dueDate ? new Date(dto.dueDate) : null,
       createdById: userId,
       groupId: dto.groupId ?? null,
+      subjectId: subjectIdRaw,
     };
 
     const created = await this.prisma.task.create({
       data,
       include: {
         group: true,
+        subject: { select: { id: true, name: true } },
         createdBy: {
           select: {
             id: true,
@@ -415,22 +431,7 @@ export class TasksService {
       },
     });
 
-    return {
-      id: created.id,
-      title: created.title,
-      description: created.description,
-      status: created.status,
-      createdAt: created.createdAt,
-      dueDate: created.dueDate ?? null,
-      group: created.group
-        ? { id: created.group.id, name: created.group.name }
-        : null,
-      createdBy: {
-        id: created.createdBy.id,
-        fullName: created.createdBy.fullName,
-        roles: created.createdBy.roles.map((role) => role.name),
-      },
-    };
+    return this.mapTask(created as TaskWithRelations);
   }
   // Обработка PATCH /tasks/:id
   async updateTask(
@@ -454,7 +455,14 @@ export class TasksService {
       throw new ForbiddenException('Недостаточно прав для изменения задачи.');
     }
 
-    const data = {
+    const data: {
+      title: string;
+      description: string;
+      status: TaskStatus;
+      dueDate: Date | null;
+      groupId: number | null;
+      subjectId?: number | null;
+    } = {
       title: dto.title ?? existing.title,
       description: dto.description ?? existing.description,
       status: dto.status ?? existing.status,
@@ -472,11 +480,24 @@ export class TasksService {
             : dto.groupId,
     };
 
+    if (typeof dto.subjectId !== 'undefined') {
+      if (dto.subjectId === null) {
+        data.subjectId = null;
+      } else {
+        const parsedSubjectId = Number(dto.subjectId);
+        if (!Number.isInteger(parsedSubjectId) || parsedSubjectId <= 0) {
+          throw new BadRequestException('Некорректный идентификатор предмета.');
+        }
+        data.subjectId = parsedSubjectId;
+      }
+    }
+
     const updated = await this.prisma.task.update({
       where: { id: taskId },
       data,
       include: {
         group: true,
+        subject: { select: { id: true, name: true } },
         createdBy: {
           select: {
             id: true,
@@ -487,22 +508,7 @@ export class TasksService {
       },
     });
 
-    return {
-      id: updated.id,
-      title: updated.title,
-      description: updated.description,
-      status: updated.status,
-      createdAt: updated.createdAt,
-      dueDate: updated.dueDate ?? null,
-      group: updated.group
-        ? { id: updated.group.id, name: updated.group.name }
-        : null,
-      createdBy: {
-        id: updated.createdBy.id,
-        fullName: updated.createdBy.fullName,
-        roles: updated.createdBy.roles.map((role) => role.name),
-      },
-    };
+    return this.mapTask(updated as TaskWithRelations);
   }
   // Обновление статуса задачи
   async updateTaskStatus(
@@ -535,6 +541,25 @@ export class TasksService {
       throw new ForbiddenException('Недостаточно прав для удаления задачи.');
     }
 
+    const submissions = await this.prisma.submission.findMany({
+      where: { taskId },
+      select: { fileUrl: true },
+    });
+
+    await Promise.all(
+      submissions.map(async (submission) => {
+        if (submission.fileUrl) {
+          const filePath = path.join(process.cwd(), submission.fileUrl);
+          try {
+            await fs.promises.unlink(filePath);
+          } catch (err) {
+            console.error('Не удалось удалить файл отправки:', err);
+          }
+        }
+      }),
+    );
+
+    await this.prisma.submission.deleteMany({ where: { taskId } });
     await this.prisma.task.delete({ where: { id: taskId } });
     return { success: true as const };
   }

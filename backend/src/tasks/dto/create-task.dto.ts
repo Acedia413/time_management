@@ -6,4 +6,5 @@ export class CreateTaskDto {
   dueDate?: Date | string;
   status?: TaskStatus;
   groupId?: number;
+  subjectId?: number;
 }

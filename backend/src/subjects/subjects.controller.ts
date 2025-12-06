@@ -11,6 +11,7 @@ import {
   Put,
   Query,
   Req,
+  UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
 import { SubjectsService } from './subjects.service';
@@ -18,8 +19,8 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CreateSubjectDto } from './dto/create-subject.dto';
 import { UpdateSubjectDto } from './dto/update-subject.dto';
 import { Request } from 'express';
-// Добавлена исключительная ситуация под неверный идентификатор кафедры
-type AuthenticatedRequest = Request & { user?: { roles?: string[] } };
+
+type AuthenticatedRequest = Request & { user?: { sub?: number; roles?: string[] } };
 @UseGuards(JwtAuthGuard)
 @Controller('subjects')
 export class SubjectsController {
@@ -36,6 +37,27 @@ export class SubjectsController {
       : undefined;
 
     return this.subjectsService.findAll(parsedDepartmentId);
+  }
+  // Получение предметов преподавателя
+  @Get('teacher/me')
+  findForTeacher(@Req() req: AuthenticatedRequest) {
+    const userId = req.user?.sub;
+    if (!userId) {
+      throw new UnauthorizedException();
+    }
+
+    const roles = req.user?.roles ?? [];
+    const normalized = roles.map((role) => role.toUpperCase());
+    const isTeacher = normalized.includes('TEACHER');
+    const isAdmin = normalized.includes('ADMIN');
+
+    if (!isTeacher && !isAdmin) {
+      throw new ForbiddenException(
+        'Предметы преподавателя доступны только преподавателям.',
+      );
+    }
+
+    return this.subjectsService.findForTeacher(userId);
   }
   // Добавление предмета
   @Post()
