@@ -4,24 +4,52 @@ import React, { useEffect, useState } from "react";
 
 interface DashboardProps {
   currentRole: string;
+  onNavigate?: (view: string) => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ currentRole }) => {
-  const [userCount, setUserCount] = useState<number | null>(null);
+type UserStats = {
+  total: number | null;
+  students: number | null;
+  teachers: number | null;
+};
+
+type SimpleUser = {
+  roles?: string[];
+};
+
+const initialStats: UserStats = {
+  total: null,
+  students: null,
+  teachers: null,
+};
+
+const Dashboard: React.FC<DashboardProps> = ({ currentRole, onNavigate }) => {
+  const [userStats, setUserStats] = useState<UserStats>(initialStats);
+  const [isUserStatsLoading, setIsUserStatsLoading] = useState(false);
 
   const apiUrl =
     process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      setUserCount(null);
+    if (currentRole !== "admin") {
+      setUserStats(initialStats);
+      setIsUserStatsLoading(false);
       return;
     }
 
+    const token = localStorage.getItem("token");
+    if (!token) {
+      setUserStats(initialStats);
+      setIsUserStatsLoading(false);
+      return;
+    }
+
+    let aborted = false;
+    setIsUserStatsLoading(true);
+
     const load = async () => {
       try {
-        const response = await fetch(`${apiUrl}/users/count`, {
+        const response = await fetch(`${apiUrl}/users`, {
           headers: { Authorization: `Bearer ${token}` },
         });
 
@@ -30,14 +58,53 @@ const Dashboard: React.FC<DashboardProps> = ({ currentRole }) => {
         }
 
         const data = await response.json();
-        setUserCount(typeof data.count === "number" ? data.count : null);
+        if (!Array.isArray(data)) {
+          throw new Error("invalid");
+        }
+
+        if (aborted) {
+          return;
+        }
+
+        const normalizeRole = (role?: string) => (role ?? "").toUpperCase();
+
+        const total = data.length;
+        const students = data.filter((user: SimpleUser) =>
+          Array.isArray(user.roles)
+            ? user.roles.some((role) => normalizeRole(role) === "STUDENT")
+            : false,
+        ).length;
+        const teachers = data.filter((user: SimpleUser) =>
+          Array.isArray(user.roles)
+            ? user.roles.some((role) => normalizeRole(role) === "TEACHER")
+            : false,
+        ).length;
+
+        setUserStats({
+          total,
+          students,
+          teachers,
+        });
       } catch {
-        setUserCount(null);
+        if (!aborted) {
+          setUserStats(initialStats);
+        }
+      } finally {
+        if (!aborted) {
+          setIsUserStatsLoading(false);
+        }
       }
     };
 
     load();
-  }, [apiUrl]);
+    return () => {
+      aborted = true;
+    };
+  }, [apiUrl, currentRole]);
+
+  const handleUsersNavigate = () => {
+    onNavigate?.("users");
+  };
 
   const renderContent = () => {
     if (currentRole === "student") {
@@ -106,9 +173,49 @@ const Dashboard: React.FC<DashboardProps> = ({ currentRole }) => {
     } else {
       return (
         <div className="dashboard-grid">
-          <div className="card stat-card">
+          <div
+            className="card stat-card"
+            role={onNavigate ? "button" : undefined}
+            tabIndex={onNavigate ? 0 : undefined}
+            onClick={handleUsersNavigate}
+            onKeyDown={(event) => {
+              if (!onNavigate) {
+                return;
+              }
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                handleUsersNavigate();
+              }
+            }}
+            style={{
+              cursor: onNavigate ? "pointer" : "default",
+              display: "flex",
+              flexDirection: "column",
+              gap: 4,
+            }}
+          >
             <h3>Всего пользователей</h3>
-            <div className="value">{userCount ?? "-"}</div>
+            <div className="value">
+              {isUserStatsLoading ? "..." : userStats.total ?? "-"}
+            </div>
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                color: "var(--text-muted)",
+                fontSize: "0.95rem",
+                lineHeight: 1.4,
+              }}
+            >
+              <span>
+                Студенты:{" "}
+                {isUserStatsLoading ? "..." : userStats.students ?? "-"}
+              </span>
+              <span>
+                Преподаватели:{" "}
+                {isUserStatsLoading ? "..." : userStats.teachers ?? "-"}
+              </span>
+            </div>
           </div>
           <div className="card stat-card">
             <h3>Задач в системе</h3>
@@ -132,3 +239,5 @@ const Dashboard: React.FC<DashboardProps> = ({ currentRole }) => {
 };
 
 export default Dashboard;
+
+

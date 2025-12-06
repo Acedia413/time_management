@@ -43,6 +43,14 @@ export default function Home() {
     setCurrentRole(profileRole ?? "student");
   }, [profileRole]);
 
+  const handleNavigate = (view: string) => {
+    if (view === "tasks") {
+      router.push("/tasks");
+      return;
+    }
+    setCurrentView(view);
+  };
+
   if (profileLoading) {
     return (
       <div
@@ -81,7 +89,9 @@ export default function Home() {
   const renderContent = () => {
     switch (currentView) {
       case "dashboard":
-        return <Dashboard currentRole={currentRole} />;
+        return (
+          <Dashboard currentRole={currentRole} onNavigate={handleNavigate} />
+        );
       case "tasks":
         return currentRole === "student" ? (
           <div>
@@ -133,13 +143,7 @@ export default function Home() {
     <div style={{ minHeight: "100vh" }}>
       <Sidebar
         currentView={currentView}
-        navigate={(view) => {
-          if (view === "tasks") {
-            router.push("/tasks");
-            return;
-          }
-          setCurrentView(view);
-        }}
+        navigate={handleNavigate}
         currentRole={currentRole}
         user={user}
       />
