@@ -64,6 +64,7 @@ model Subject {
   departmentId  Int
   department    Department  @relation(fields: [departmentId], references: [id], onDelete: Cascade)
   teachers      User[]
+  tasks         Task[]
 
   @@unique([name, departmentId])
 }
@@ -90,8 +91,10 @@ model Task {
   dueDate     DateTime?
   createdById Int
   groupId     Int?
+  subjectId   Int?
   createdBy   User         @relation("TasksCreated", fields: [createdById], references: [id])
   group       Group?       @relation(fields: [groupId], references: [id])
+  subject     Subject?     @relation(fields: [subjectId], references: [id])
   submissions Submission[]
 
   @@unique([title, groupId])
