@@ -17,25 +17,67 @@ type UserListItem = {
     | null;
 };
 
-const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
-
 const Journal: React.FC = () => {
   const [users, setUsers] = useState<UserListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [apiUrl, setApiUrl] = useState<string | null>(null);
+  const [configReady, setConfigReady] = useState(false);
+  const defaultApiUrl =
+    process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      setError("Нет токена авторизации");
-      setIsLoading(false);
+    const controller = new AbortController();
+    const loadConfig = async () => {
+      let resolved = defaultApiUrl;
+      try {
+        const response = await fetch("/api/config", {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        if (response.ok) {
+          const data = (await response.json()) as { apiUrl?: string };
+          if (data?.apiUrl) {
+            resolved = data.apiUrl;
+          }
+        }
+      } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") {
+          return;
+        }
+      } finally {
+        setApiUrl(resolved);
+        setConfigReady(true);
+      }
+    };
+
+    loadConfig();
+
+    return () => controller.abort();
+  }, [defaultApiUrl]);
+
+  useEffect(() => {
+    if (!configReady || !apiUrl) {
       return;
     }
 
+    const controller = new AbortController();
+
     const fetchUsers = async () => {
+      setIsLoading(true);
+      setError(null);
+      const token = localStorage.getItem("token");
+
+      if (!token) {
+        setError("Нет токена авторизации");
+        setIsLoading(false);
+        return;
+      }
+
       try {
         const response = await fetch(`${apiUrl}/users`, {
           headers: { Authorization: `Bearer ${token}` },
+          signal: controller.signal,
         });
 
         if (!response.ok) {
@@ -51,6 +93,9 @@ const Journal: React.FC = () => {
 
         setUsers(normalized);
       } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") {
+          return;
+        }
         setError(
           err instanceof Error
             ? err.message
@@ -62,7 +107,8 @@ const Journal: React.FC = () => {
     };
 
     fetchUsers();
-  }, []);
+    return () => controller.abort();
+  }, [apiUrl, configReady]);
 
   const formatStatus = (activity?: UserListItem["latestActivity"]) => {
     if (!activity) {
