@@ -7,4 +7,5 @@ export class UpdateTaskDto {
   status?: TaskStatus;
   groupId?: number | null;
   subjectId?: number | null;
+  inReviewStudentId?: number | null;
 }

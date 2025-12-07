@@ -41,6 +41,7 @@ model User {
   groupId      Int?
   group        Group?       @relation(fields: [groupId], references: [id])
   createdTasks Task[]       @relation("TasksCreated")
+  tasksReviewing Task[]     @relation("TasksReviewing")
   submissions  Submission[]
 }
 
@@ -92,9 +93,11 @@ model Task {
   createdById Int
   groupId     Int?
   subjectId   Int?
+  inReviewStudentId Int?
   createdBy   User         @relation("TasksCreated", fields: [createdById], references: [id])
   group       Group?       @relation(fields: [groupId], references: [id])
   subject     Subject?     @relation(fields: [subjectId], references: [id])
+  inReviewStudent User?    @relation("TasksReviewing", fields: [inReviewStudentId], references: [id])
   submissions Submission[]
 
   @@unique([title, groupId])

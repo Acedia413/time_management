@@ -8,25 +8,25 @@ import {
   Patch,
   Post,
   Req,
-  UploadedFile,
   UnauthorizedException,
+  UploadedFile,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import {
-  TasksService,
-  TaskResponse,
-  TeacherGroupStudentsResponse,
-} from './tasks.service';
-import { CreateTaskDto } from './dto/create-task.dto';
-import { Request } from 'express';
-import { UpdateTaskDto } from './dto/update-task.dto';
-import { CreateSubmissionDto } from './dto/create-submission.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { Request } from 'express';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { CreateSubmissionDto } from './dto/create-submission.dto';
+import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskStatusDto } from './dto/update-task-status.dto';
+import { UpdateTaskDto } from './dto/update-task.dto';
+import {
+  TaskResponse,
+  TasksService,
+  TeacherGroupStudentsResponse,
+} from './tasks.service';
 // Интерфейс для аутентифицированного запроса
 type AuthenticatedRequest = Request & {
   user?: { sub: number; roles?: string[] };
@@ -139,7 +139,13 @@ export class TasksController {
     if (!userId) {
       throw new UnauthorizedException();
     }
-    return this.tasksService.updateTaskStatus(id, dto.status, userId, roles);
+    return this.tasksService.updateTaskStatus(
+      id,
+      dto.status,
+      dto.studentId ?? null,
+      userId,
+      roles,
+    );
   }
 
   // Удаляет задачу
@@ -155,7 +161,6 @@ export class TasksController {
     }
     return this.tasksService.deleteTask(id, userId, roles);
   }
-  // Получить отправки по задаче
   @Get(':id/submissions')
   findSubmissions(
     @Param('id', ParseIntPipe) id: number,
@@ -166,7 +171,14 @@ export class TasksController {
     if (!userId) {
       throw new UnauthorizedException();
     }
-    return this.tasksService.getSubmissionsForTask(id, userId, roles);
+    const studentIdParam = (req.query as { studentId?: string }).studentId;
+    const filterStudentId = studentIdParam ? Number(studentIdParam) : undefined;
+    return this.tasksService.getSubmissionsForTask(
+      id,
+      userId,
+      roles,
+      filterStudentId,
+    );
   }
   // Создает отправку
   @Post(':id/submissions')
@@ -186,6 +198,7 @@ export class TasksController {
   @Post(':id/submissions/upload')
   @UseInterceptors(
     FileInterceptor('file', {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
       storage: diskStorage({
         destination: './uploads',
         filename: (

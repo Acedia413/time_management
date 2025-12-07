@@ -22,6 +22,7 @@ export type TaskResponse = {
   group: { id: number; name: string } | null;
   subject: { id: number; name: string } | null;
   createdBy: { id: number; fullName: string; roles: RoleName[] };
+  inReviewStudent: { id: number; fullName: string } | null;
 };
 // Ответ для списка задач по студенту
 export type StudentTasksResponse = {
@@ -57,6 +58,7 @@ type TaskWithRelations = {
   dueDate: Date | null;
   group: { id: number; name: string } | null;
   subject: { id: number; name: string } | null;
+  inReviewStudent: { id: number; fullName: string } | null;
   createdBy: {
     id: number;
     fullName: string;
@@ -79,6 +81,12 @@ export class TasksService {
       group: task.group ? { id: task.group.id, name: task.group.name } : null,
       subject: task.subject
         ? { id: task.subject.id, name: task.subject.name }
+        : null,
+      inReviewStudent: task.inReviewStudent
+        ? {
+            id: task.inReviewStudent.id,
+            fullName: task.inReviewStudent.fullName,
+          }
         : null,
       createdBy: {
         id: task.createdBy.id,
@@ -156,17 +164,18 @@ export class TasksService {
 
     return groups;
   }
-  // Отдает все доступные пользователю задачи
   async findAllForUser(
     userId: number,
     roles: string[],
   ): Promise<TaskResponse[]> {
-    const isStudent = roles
-      .map((r) => r.toUpperCase())
-      .includes(RoleName.STUDENT);
+    const normalizedRoles = roles.map((r) => r.toUpperCase()) as RoleName[];
+    const isStudentOnly =
+      normalizedRoles.includes(RoleName.STUDENT) &&
+      !normalizedRoles.includes(RoleName.TEACHER) &&
+      !normalizedRoles.includes(RoleName.ADMIN);
     let groupId: number | null = null;
 
-    if (isStudent) {
+    if (isStudentOnly) {
       const user = await this.prisma.user.findUnique({
         where: { id: userId },
         select: { groupId: true },
@@ -175,7 +184,7 @@ export class TasksService {
     }
 
     const tasks = await this.prisma.task.findMany({
-      where: isStudent
+      where: isStudentOnly
         ? {
             OR: [
               { groupId: null },
@@ -186,6 +195,10 @@ export class TasksService {
       include: {
         group: true,
         subject: { select: { id: true, name: true } },
+        inReviewStudent: { select: { id: true, fullName: true } },
+        submissions: isStudentOnly
+          ? { where: { studentId: userId }, select: { id: true } }
+          : false,
         createdBy: {
           select: {
             id: true,
@@ -197,7 +210,20 @@ export class TasksService {
       orderBy: [{ dueDate: 'asc' }, { createdAt: 'desc' }],
     });
 
-    return tasks.map((task) => this.mapTask(task as TaskWithRelations));
+    return tasks.map((task) => {
+      const mapped = this.mapTask(task as TaskWithRelations);
+      if (isStudentOnly && task.status !== TaskStatus.CLOSED) {
+        const hasSubmission =
+          Array.isArray((task as any).submissions) &&
+          (task as any).submissions.length > 0;
+        if (hasSubmission) {
+          mapped.status = TaskStatus.IN_REVIEW;
+        } else if (task.status === TaskStatus.IN_REVIEW) {
+          mapped.status = TaskStatus.ACTIVE;
+        }
+      }
+      return mapped;
+    });
   }
 
   // Отдает задачи для студента
@@ -237,6 +263,7 @@ export class TasksService {
       include: {
         group: true,
         subject: { select: { id: true, name: true } },
+        inReviewStudent: { select: { id: true, fullName: true } },
         createdBy: {
           select: {
             id: true,
@@ -259,18 +286,19 @@ export class TasksService {
     };
   }
 
-  // Обработка GET /tasks/:id с проверкой доступа для студента
   async findOneForUser(
     taskId: number,
     userId: number,
     roles: string[],
   ): Promise<TaskResponse> {
-    const isStudent = roles
-      .map((r) => r.toUpperCase())
-      .includes(RoleName.STUDENT);
+    const normalizedRoles = roles.map((r) => r.toUpperCase()) as RoleName[];
+    const isStudentOnly =
+      normalizedRoles.includes(RoleName.STUDENT) &&
+      !normalizedRoles.includes(RoleName.TEACHER) &&
+      !normalizedRoles.includes(RoleName.ADMIN);
     let userGroupId: number | null = null;
 
-    if (isStudent) {
+    if (isStudentOnly) {
       const user = await this.prisma.user.findUnique({
         where: { id: userId },
         select: { groupId: true },
@@ -283,6 +311,10 @@ export class TasksService {
       include: {
         group: true,
         subject: { select: { id: true, name: true } },
+        inReviewStudent: { select: { id: true, fullName: true } },
+        submissions: isStudentOnly
+          ? { where: { studentId: userId }, select: { id: true } }
+          : false,
         createdBy: {
           select: {
             id: true,
@@ -297,7 +329,7 @@ export class TasksService {
       throw new NotFoundException('Задача не найдена.');
     }
 
-    if (isStudent) {
+    if (isStudentOnly) {
       const allowed =
         task.groupId === null ||
         (userGroupId !== null && task.groupId === userGroupId);
@@ -306,19 +338,49 @@ export class TasksService {
       }
     }
 
-    return this.mapTask(task as TaskWithRelations);
+    const mapped = this.mapTask(task as TaskWithRelations);
+
+    if (isStudentOnly && task.status !== TaskStatus.CLOSED) {
+      const hasSubmission =
+        Array.isArray((task as any).submissions) &&
+        (task as any).submissions.length > 0;
+      if (hasSubmission) {
+        mapped.status = TaskStatus.IN_REVIEW;
+      } else if (task.status === TaskStatus.IN_REVIEW) {
+        mapped.status = TaskStatus.ACTIVE;
+      }
+    }
+
+    return mapped;
   }
-  // Метод проверки доступа к задаче
   async getSubmissionsForTask(
     taskId: number,
     userId: number,
     roles: string[],
+    filterStudentId?: number,
   ): Promise<SubmissionResponse[]> {
-    // Проверяем, что задача видима пользователю
     await this.findOneForUser(taskId, userId, roles);
 
+    const normalizedRoles = roles.map((r) => r.toUpperCase()) as RoleName[];
+    const isStudent =
+      normalizedRoles.includes(RoleName.STUDENT) &&
+      !normalizedRoles.includes(RoleName.TEACHER) &&
+      !normalizedRoles.includes(RoleName.ADMIN);
+
+    let whereClause: { taskId: number; studentId?: number };
+    if (isStudent) {
+      whereClause = { taskId, studentId: userId };
+    } else if (
+      typeof filterStudentId === 'number' &&
+      !Number.isNaN(filterStudentId)
+    ) {
+      whereClause = { taskId, studentId: filterStudentId };
+    } else {
+      whereClause = { taskId };
+    }
+
     const submissions = await this.prisma.submission.findMany({
-      where: { taskId },
+      where: whereClause,
       include: { student: { select: { id: true, fullName: true } } },
       orderBy: { submittedAt: 'desc' },
     });
@@ -441,6 +503,7 @@ export class TasksService {
       createdById: userId,
       groupId: dto.groupId ?? null,
       subjectId: subjectIdRaw,
+      inReviewStudentId: null,
     };
 
     const created = await this.prisma.task.create({
@@ -448,6 +511,7 @@ export class TasksService {
       include: {
         group: true,
         subject: { select: { id: true, name: true } },
+        inReviewStudent: { select: { id: true, fullName: true } },
         createdBy: {
           select: {
             id: true,
@@ -489,6 +553,7 @@ export class TasksService {
       dueDate: Date | null;
       groupId: number | null;
       subjectId?: number | null;
+      inReviewStudentId?: number | null;
     } = {
       title: dto.title ?? existing.title,
       description: dto.description ?? existing.description,
@@ -519,12 +584,25 @@ export class TasksService {
       }
     }
 
+    if (typeof dto.inReviewStudentId !== 'undefined') {
+      if (dto.inReviewStudentId === null) {
+        data.inReviewStudentId = null;
+      } else {
+        const parsedStudentId = Number(dto.inReviewStudentId);
+        if (!Number.isInteger(parsedStudentId) || parsedStudentId <= 0) {
+          throw new BadRequestException('Некорректный идентификатор студента.');
+        }
+        data.inReviewStudentId = parsedStudentId;
+      }
+    }
+
     const updated = await this.prisma.task.update({
       where: { id: taskId },
       data,
       include: {
         group: true,
         subject: { select: { id: true, name: true } },
+        inReviewStudent: { select: { id: true, fullName: true } },
         createdBy: {
           select: {
             id: true,
@@ -541,10 +619,31 @@ export class TasksService {
   async updateTaskStatus(
     taskId: number,
     status: TaskStatus,
+    studentId: number | null | undefined,
     userId: number,
     roles: string[],
   ): Promise<TaskResponse> {
-    return this.updateTask(taskId, { status }, userId, roles);
+    const payload: UpdateTaskDto = { status };
+    let parsedStudentId: number | null | undefined = undefined;
+    if (typeof studentId !== 'undefined') {
+      if (studentId === null) {
+        parsedStudentId = null;
+      } else {
+        const numeric = Number(studentId);
+        if (!Number.isInteger(numeric) || numeric <= 0) {
+          throw new BadRequestException('Некорректный идентификатор студента.');
+        }
+        parsedStudentId = numeric;
+      }
+    }
+
+    if (status === TaskStatus.IN_REVIEW) {
+      payload.inReviewStudentId =
+        typeof parsedStudentId === 'undefined' ? null : parsedStudentId;
+    } else {
+      payload.inReviewStudentId = null;
+    }
+    return this.updateTask(taskId, payload, userId, roles);
   }
 
   // Обработка DELETE /tasks/:id
