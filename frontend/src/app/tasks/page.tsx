@@ -34,9 +34,11 @@ export default function TasksAllPage() {
             <button className="btn btn-primary" disabled>
               Все задачи
             </button>
-            <button className="btn" onClick={() => router.push("/tasks/my")}>
-              Мои задачи
-            </button>
+            {currentRole !== "student" && (
+              <button className="btn" onClick={() => router.push("/tasks/my")}>
+                Мои задачи
+              </button>
+            )}
             <button className="btn" onClick={() => router.push("/tasks/teacher")}>
               Задачи преподавателей
             </button>

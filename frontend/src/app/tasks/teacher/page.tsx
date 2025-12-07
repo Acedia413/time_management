@@ -21,6 +21,7 @@ type TaskItem = {
   createdAt: string;
   group: { id: number; name: string } | null;
   subject?: { id: number; name: string } | null;
+  inReviewStudent?: { id: number; fullName: string } | null;
 };
 
 export default function TasksTeacherPage() {
@@ -40,6 +41,8 @@ export default function TasksTeacherPage() {
   const [studentTasks, setStudentTasks] = useState<TaskItem[]>([]);
   const [studentTasksLoading, setStudentTasksLoading] = useState(false);
   const [studentTasksError, setStudentTasksError] = useState<string | null>(null);
+  const [teacherActionLoading, setTeacherActionLoading] = useState<number | null>(null);
+  const [teacherActionError, setTeacherActionError] = useState<string | null>(null);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
   const initialGroupParam = searchParams.get("groupId");
@@ -214,9 +217,11 @@ export default function TasksTeacherPage() {
             <button className="btn" onClick={() => router.push("/tasks")}>
               Все задачи
             </button>
-            <button className="btn" onClick={() => router.push("/tasks/my")}>
-              Мои задачи
-            </button>
+            {currentRole !== "student" && (
+              <button className="btn" onClick={() => router.push("/tasks/my")}>
+                Мои задачи
+              </button>
+            )}
             <button className="btn btn-primary" disabled>
               Задачи преподавателей
             </button>
@@ -241,6 +246,8 @@ export default function TasksTeacherPage() {
                 currentRole={currentRole}
                 currentUserId={user?.id}
                 mode="teacher"
+                teacherStudentId={currentRole === "student" ? user?.id : undefined}
+                creatorRoleFilter="teacher"
               />
             </div>
           ) : isAdminProfile ? (
@@ -250,6 +257,7 @@ export default function TasksTeacherPage() {
                 currentRole={currentRole}
                 currentUserId={user?.id}
                 creatorRoleFilter="teacher"
+                studentFilterId={currentRole === "student" ? user?.id : undefined}
               />
             </div>
           ) : (
@@ -314,6 +322,9 @@ export default function TasksTeacherPage() {
               <h4 style={{ marginTop: 0, marginBottom: 12 }}>
                 Задачи студента {selectedStudentName ?? ""}
               </h4>
+              {isTeacherProfile && teacherActionError && (
+                <p style={{ color: "var(--danger)" }}>{teacherActionError}</p>
+              )}
               {studentTasksLoading && <p>Загружаем задачи...</p>}
               {studentTasksError && (
                 <p style={{ color: "var(--danger)" }}>{studentTasksError}</p>
@@ -371,6 +382,67 @@ export default function TasksTeacherPage() {
                       >
                         Открыть
                       </button>
+                      {isTeacherProfile &&
+                        task.status !== "IN_REVIEW" &&
+                        task.status !== "CLOSED" && (
+                          <button
+                            className="btn"
+                            style={{ color: "var(--primary)" }}
+                            disabled={teacherActionLoading === task.id}
+                            onClick={() => {
+                              const token = localStorage.getItem("token");
+                              if (!token) {
+                                setTeacherActionError("Требуется авторизация.");
+                                return;
+                              }
+                              const updateStatus = async () => {
+                                setTeacherActionError(null);
+                                setTeacherActionLoading(task.id);
+                                try {
+                                  const response = await fetch(`${apiUrl}/tasks/${task.id}/status`, {
+                                    method: "PATCH",
+                                    headers: {
+                                      "Content-Type": "application/json",
+                                      Authorization: `Bearer ${token}`,
+                                    },
+                                    body: JSON.stringify({
+                                      status: "IN_REVIEW",
+                                      studentId: selectedStudentId,
+                                    }),
+                                  });
+                                  if (!response.ok) {
+                                    const details = await response.json().catch(() => null);
+                                    const message =
+                                      (Array.isArray(details?.message)
+                                        ? details.message[0]
+                                        : details?.message) ?? "Не удалось обновить статус.";
+                                    throw new Error(message);
+                                  }
+                                  const updated = await response.json();
+                                  setStudentTasks((prev) =>
+                                    prev.map((t) =>
+                                      t.id === task.id
+                                        ? {
+                                            ...t,
+                                            status: updated?.status ?? "IN_REVIEW",
+                                          }
+                                        : t,
+                                    ),
+                                  );
+                                } catch (err) {
+                                  setTeacherActionError(
+                                    err instanceof Error ? err.message : "Ошибка обновления статуса.",
+                                  );
+                                } finally {
+                                  setTeacherActionLoading(null);
+                                }
+                              };
+                              void updateStatus();
+                            }}
+                          >
+                            {teacherActionLoading === task.id ? "Обновляем..." : "На проверке"}
+                          </button>
+                        )}
                     </div>
                   ))}
                 </div>

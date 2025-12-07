@@ -1,11 +1,11 @@
 "use client";
 
-import { useParams, useSearchParams, useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 import Header from "../../../components/Header";
-import Sidebar from "../../../components/Sidebar";
 import { useProfile } from "../../../components/ProfileProvider";
+import Sidebar from "../../../components/Sidebar";
 
 type TaskItem = {
   id: number;
@@ -54,12 +54,12 @@ export default function TaskDetailPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
-  const apiUrl =
-    process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
   const from = searchParams.get("from") ?? "all";
   const teacherGroupName = searchParams.get("groupName");
   const teacherStudentName = searchParams.get("studentName");
+  const teacherStudentId = searchParams.get("studentId");
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -79,25 +79,23 @@ export default function TaskDetailPage() {
         const found = (await singleResponse.json()) as TaskItem;
         setTask(found);
 
-        const submissionsResponse = await fetch(
-          `${apiUrl}/tasks/${params?.id}/submissions`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
+        const submissionsUrl = teacherStudentId
+          ? `${apiUrl}/tasks/${params?.id}/submissions?studentId=${teacherStudentId}`
+          : `${apiUrl}/tasks/${params?.id}/submissions`;
+        const submissionsResponse = await fetch(submissionsUrl, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
         if (submissionsResponse.ok) {
           const subs = (await submissionsResponse.json()) as SubmissionItem[];
           setSubmissions(subs);
         }
       } catch (e) {
-        setError(
-          e instanceof Error ? e.message : "Ошибка загрузки задачи.",
-        );
+        setError(e instanceof Error ? e.message : "Ошибка загрузки задачи.");
       }
     };
 
     load();
-  }, [router, apiUrl, params?.id]);
+  }, [router, apiUrl, params?.id, teacherStudentId]);
 
   const handleDelete = async (submissionId: number) => {
     const token = localStorage.getItem("token");
@@ -155,13 +153,7 @@ export default function TaskDetailPage() {
     }
     items.push({ label: task?.title ?? "Задача" });
     return items;
-  }, [
-    from,
-    task?.title,
-    teacherGroupName,
-    teacherStudentName,
-    groupParam,
-  ]);
+  }, [from, task?.title, teacherGroupName, teacherStudentName, groupParam]);
 
   return (
     <div style={{ minHeight: "100vh" }}>
@@ -198,7 +190,9 @@ export default function TaskDetailPage() {
           </div>
           {from === "teacher" && (teacherGroupName || teacherStudentName) && (
             <div className="card" style={{ marginBottom: 12 }}>
-              <h4 style={{ marginTop: 0, marginBottom: 8 }}>Контекст студента</h4>
+              <h4 style={{ marginTop: 0, marginBottom: 8 }}>
+                Контекст студента
+              </h4>
               {teacherGroupName && (
                 <p style={{ margin: 0, color: "var(--text-muted)" }}>
                   Группа: <strong>{teacherGroupName}</strong>
@@ -210,7 +204,10 @@ export default function TaskDetailPage() {
                 </p>
               )}
               <div style={{ marginTop: 8 }}>
-                <button className="btn" onClick={() => router.push("/tasks/teacher")}>
+                <button
+                  className="btn"
+                  onClick={() => router.push("/tasks/teacher")}
+                >
                   Вернуться к задачам преподавателя
                 </button>
               </div>
@@ -224,24 +221,37 @@ export default function TaskDetailPage() {
           {task && (
             <div className="card">
               <div style={{ marginBottom: 8, display: "flex", gap: 8 }}>
-                <span className="badge">{statusLabels[task.status] ?? task.status}</span>
+                <span className="badge">
+                  {statusLabels[task.status] ?? task.status}
+                </span>
                 {task.group && (
-                  <span className="badge" style={{ background: "#f3f4f6", color: "#666" }}>
+                  <span
+                    className="badge"
+                    style={{ background: "#f3f4f6", color: "#666" }}
+                  >
                     {task.group.name}
                   </span>
                 )}
                 {task.subject && (
-                  <span className="badge" style={{ background: "#e0f2fe", color: "#0369a1" }}>
+                  <span
+                    className="badge"
+                    style={{ background: "#e0f2fe", color: "#0369a1" }}
+                  >
                     {task.subject.name}
                   </span>
                 )}
               </div>
               <h3 style={{ marginTop: 0 }}>{task.title}</h3>
               <p style={{ color: "var(--text-muted)" }}>{task.description}</p>
-              <div style={{ display: "flex", gap: 16, color: "var(--text-muted)", flexWrap: "wrap" }}>
-                <span>
-                  Автор: {task.createdBy?.fullName ?? "Неизвестно"}
-                </span>
+              <div
+                style={{
+                  display: "flex",
+                  gap: 16,
+                  color: "var(--text-muted)",
+                  flexWrap: "wrap",
+                }}
+              >
+                <span>Автор: {task.createdBy?.fullName ?? "Неизвестно"}</span>
                 <span>
                   Срок:{" "}
                   {task.dueDate && !Number.isNaN(Date.parse(task.dueDate))
@@ -268,15 +278,31 @@ export default function TaskDetailPage() {
                       borderRadius: 8,
                     }}
                   >
-                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 4,
+                      }}
+                    >
                       <span style={{ fontWeight: 600 }}>
                         {sub.student?.fullName ?? "Неизвестный студент"}
                       </span>
-                      <span style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>
+                      <span
+                        style={{
+                          color: "var(--text-muted)",
+                          fontSize: "0.9rem",
+                        }}
+                      >
                         {new Date(sub.submittedAt).toLocaleString("ru-RU")}
                       </span>
                       {sub.content && (
-                        <span style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>
+                        <span
+                          style={{
+                            color: "var(--text-muted)",
+                            fontSize: "0.9rem",
+                          }}
+                        >
                           {sub.content}
                         </span>
                       )}
@@ -323,7 +349,9 @@ export default function TaskDetailPage() {
           )}
           {currentRole === "student" && (
             <div className="card" style={{ marginTop: 12 }}>
-              <h4 style={{ marginTop: 0, marginBottom: 8 }}>Добавить отправку</h4>
+              <h4 style={{ marginTop: 0, marginBottom: 8 }}>
+                Добавить отправку
+              </h4>
               <form
                 onSubmit={async (e) => {
                   e.preventDefault();
@@ -400,7 +428,8 @@ export default function TaskDetailPage() {
                       const message =
                         (Array.isArray(details?.message)
                           ? details.message[0]
-                          : details?.message) ?? "Не удалось сохранить отправку.";
+                          : details?.message) ??
+                        "Не удалось сохранить отправку.";
                       throw new Error(message);
                     }
                     const saved = (await response.json()) as SubmissionItem;

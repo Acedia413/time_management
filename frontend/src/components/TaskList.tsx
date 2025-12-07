@@ -1,7 +1,7 @@
-﻿'use client';
+﻿"use client";
 
-import React, { useEffect, useMemo, useState, useCallback } from "react";
 import Link from "next/link";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 
 type CreatorRoleFilter = "teacher" | "admin";
 
@@ -10,6 +10,7 @@ interface TaskListProps {
   currentUserId?: number;
   mode?: "all" | "my" | "teacher";
   creatorRoleFilter?: CreatorRoleFilter;
+  studentFilterId?: number;
 }
 
 type TaskItem = {
@@ -21,6 +22,7 @@ type TaskItem = {
   createdBy: { id: number; fullName: string; roles?: string[] };
   group: { id: number; name: string } | null;
   subject?: { id: number; name: string } | null;
+  inReviewStudent?: { id: number; fullName: string } | null;
 };
 
 type TaskForm = {
@@ -60,6 +62,7 @@ const TaskList: React.FC<TaskListProps> = ({
   currentUserId,
   mode = "all",
   creatorRoleFilter,
+  studentFilterId,
 }) => {
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -83,13 +86,11 @@ const TaskList: React.FC<TaskListProps> = ({
   const [groupsLoading, setGroupsLoading] = useState(false);
   const [groupsError, setGroupsError] = useState<string | null>(null);
 
-  const apiUrl =
-    process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
   const isAdminTask = (task: TaskItem) =>
-    task.createdBy?.roles?.some(
-      (role) => role?.toUpperCase?.() === "ADMIN",
-    ) ?? false;
-// Загружаю задачи с учетом токена и подготавливаю данные для отображения
+    task.createdBy?.roles?.some((role) => role?.toUpperCase?.() === "ADMIN") ??
+    false;
+  // Загружаю задачи с учетом токена и подготавливаю данные для отображения
   const fetchTasks = useCallback(
     async (withLoader = false) => {
       if (withLoader) {
@@ -124,25 +125,29 @@ const TaskList: React.FC<TaskListProps> = ({
         }
       }
     },
-    [apiUrl],
+    [apiUrl]
   );
+
   const viewTasks = useMemo(() => {
     let scoped = tasks;
     if (mode === "my" && currentUserId) {
       if (currentRole === "teacher") {
         scoped = tasks.filter(
           (task) =>
-            task.createdBy?.id === currentUserId || task.status === "IN_REVIEW",
+            task.createdBy?.id === currentUserId || task.status === "IN_REVIEW"
         );
       } else {
         scoped = tasks.filter((task) => task.createdBy?.id === currentUserId);
       }
     } else if (currentRole === "teacher" && currentUserId) {
       scoped = tasks.filter(
-        (task) =>
-          task.createdBy?.id === currentUserId || isAdminTask(task),
+        (task) => task.createdBy?.id === currentUserId || isAdminTask(task)
       );
-    } else if (mode === "teacher" && currentRole === "student" && currentUserId) {
+    } else if (
+      mode === "teacher" &&
+      currentRole === "student" &&
+      currentUserId
+    ) {
       scoped = tasks.filter((task) => task.createdBy?.id !== currentUserId);
     }
 
@@ -151,18 +156,40 @@ const TaskList: React.FC<TaskListProps> = ({
     }
 
     const requiredRole = creatorRoleFilter.toUpperCase();
-    return scoped.filter((task) =>
+    const filteredByRole = scoped.filter((task) =>
       task.createdBy?.roles?.some(
-        (role) => role?.toUpperCase?.() === requiredRole,
-      ),
+        (role) => role?.toUpperCase?.() === requiredRole
+      )
     );
-  }, [tasks, mode, currentUserId, currentRole, creatorRoleFilter]);
+
+    if (mode === "teacher" && currentRole === "student") {
+      if (typeof studentFilterId === "number") {
+        return filteredByRole.filter((task) =>
+          task.status === "IN_REVIEW"
+            ? task?.inReviewStudent?.id === studentFilterId
+            : true
+        );
+      }
+      return filteredByRole.filter((task) => task.status !== "IN_REVIEW");
+    }
+
+    return filteredByRole;
+  }, [
+    tasks,
+    mode,
+    currentUserId,
+    currentRole,
+    creatorRoleFilter,
+    studentFilterId,
+  ]);
   // Подготавливаю статистику для отображения
   const stats = useMemo(() => {
     const total = viewTasks.length;
     const draft = viewTasks.filter((task) => task.status === "DRAFT").length;
     const active = viewTasks.filter((task) => task.status === "ACTIVE").length;
-    const inReview = viewTasks.filter((task) => task.status === "IN_REVIEW").length;
+    const inReview = viewTasks.filter(
+      (task) => task.status === "IN_REVIEW"
+    ).length;
     const closed = viewTasks.filter((task) => task.status === "CLOSED").length;
     return { total, draft, active, inReview, closed };
   }, [viewTasks]);
@@ -205,7 +232,7 @@ const TaskList: React.FC<TaskListProps> = ({
       })
       .catch((err) => {
         setSubjectsError(
-          err instanceof Error ? err.message : "Ошибка загрузки предметов.",
+          err instanceof Error ? err.message : "Ошибка загрузки предметов."
         );
       })
       .finally(() => {
@@ -241,7 +268,7 @@ const TaskList: React.FC<TaskListProps> = ({
       })
       .catch((err) => {
         setGroupsError(
-          err instanceof Error ? err.message : "Ошибка загрузки групп.",
+          err instanceof Error ? err.message : "Ошибка загрузки групп."
         );
       })
       .finally(() => {
@@ -259,9 +286,17 @@ const TaskList: React.FC<TaskListProps> = ({
             ? new Date(task.dueDate).toLocaleDateString("ru-RU")
             : "Без срока";
         const subjectName = task.subject?.name ?? null;
-        return { ...task, label, badgeClass, due, subjectName };
+        const reviewStudentName = task.inReviewStudent?.fullName ?? null;
+        return {
+          ...task,
+          label,
+          badgeClass,
+          due,
+          subjectName,
+          reviewStudentName,
+        };
       }),
-    [viewTasks],
+    [viewTasks]
   );
 
   if (isLoading) {
@@ -271,11 +306,11 @@ const TaskList: React.FC<TaskListProps> = ({
   if (error) {
     return <p style={{ color: "var(--danger)" }}>{error}</p>;
   }
-// Если пользователь имеет права на создание задач, отображаю форму создания
-// Исключительные ситуации обработаны
+  // Если пользователь имеет права на создание задач, отображаю форму создания
+  // Исключительные ситуации обработаны
   const handleStatusChange = async (
     taskId: number,
-    status: TaskForm["status"],
+    status: TaskForm["status"]
   ) => {
     setActionError(null);
     const token = localStorage.getItem("token");
@@ -299,25 +334,24 @@ const TaskList: React.FC<TaskListProps> = ({
         const message =
           (Array.isArray(details?.message)
             ? details.message[0]
-            : details?.message) ??
-          "Ошибка обновления задачи.";
+            : details?.message) ?? "Ошибка обновления задачи.";
         throw new Error(message);
       }
 
       const updated = (await response.json()) as TaskItem;
       setTasks((prev) =>
-        prev.map((task) => (task.id === taskId ? updated : task)),
+        prev.map((task) => (task.id === taskId ? updated : task))
       );
       await fetchTasks();
     } catch (err) {
       setActionError(
-        err instanceof Error ? err.message : "Ошибка обновления статуса задачи.",
+        err instanceof Error ? err.message : "Ошибка обновления статуса задачи."
       );
     } finally {
       setActionLoading(null);
     }
   };
-// Если пользователь имеет права на удаление задач, отображаю кнопку удаления
+  // Если пользователь имеет права на удаление задач, отображаю кнопку удаления
   const handleDelete = async (taskId: number) => {
     setActionError(null);
     const token = localStorage.getItem("token");
@@ -337,8 +371,7 @@ const TaskList: React.FC<TaskListProps> = ({
         const message =
           (Array.isArray(details?.message)
             ? details.message[0]
-            : details?.message) ??
-          "Ошибка удаления задачи.";
+            : details?.message) ?? "Ошибка удаления задачи.";
         throw new Error(message);
       }
 
@@ -346,13 +379,13 @@ const TaskList: React.FC<TaskListProps> = ({
       await fetchTasks();
     } catch (err) {
       setActionError(
-        err instanceof Error ? err.message : "Ошибка удаления задачи.",
+        err instanceof Error ? err.message : "Ошибка удаления задачи."
       );
     } finally {
       setActionLoading(null);
     }
   };
-// Отображаю статистику и список задач
+  // Отображаю статистику и список задач
   return (
     <div>
       {actionError && (
@@ -368,19 +401,34 @@ const TaskList: React.FC<TaskListProps> = ({
           flexWrap: "wrap",
         }}
       >
-        <span className="badge" style={{ background: "#eef2ff", color: "#4338ca" }}>
+        <span
+          className="badge"
+          style={{ background: "#eef2ff", color: "#4338ca" }}
+        >
           Всего: {stats.total}
         </span>
-        <span className="badge" style={{ background: "#fef3c7", color: "#92400e" }}>
+        <span
+          className="badge"
+          style={{ background: "#fef3c7", color: "#92400e" }}
+        >
           Черновики: {stats.draft}
         </span>
-        <span className="badge" style={{ background: "#ecfeff", color: "#0f766e" }}>
+        <span
+          className="badge"
+          style={{ background: "#ecfeff", color: "#0f766e" }}
+        >
           В работе: {stats.active}
         </span>
-        <span className="badge" style={{ background: "#fff1f2", color: "#be123c" }}>
+        <span
+          className="badge"
+          style={{ background: "#fff1f2", color: "#be123c" }}
+        >
           В проверке: {stats.inReview}
         </span>
-        <span className="badge" style={{ background: "#e5e7eb", color: "#374151" }}>
+        <span
+          className="badge"
+          style={{ background: "#e5e7eb", color: "#374151" }}
+        >
           Закрыты: {stats.closed}
         </span>
       </div>
@@ -448,8 +496,7 @@ const TaskList: React.FC<TaskListProps> = ({
                 const message =
                   (Array.isArray(details?.message)
                     ? details.message[0]
-                    : details?.message) ??
-                  "Не удалось создать задачу.";
+                    : details?.message) ?? "Не удалось создать задачу.";
                 throw new Error(message);
               }
 
@@ -466,7 +513,7 @@ const TaskList: React.FC<TaskListProps> = ({
               await fetchTasks();
             } catch (err) {
               setFormError(
-                err instanceof Error ? err.message : "Ошибка создания задачи.",
+                err instanceof Error ? err.message : "Ошибка создания задачи."
               );
             } finally {
               setIsSubmitting(false);
@@ -475,10 +522,14 @@ const TaskList: React.FC<TaskListProps> = ({
         >
           <h4 style={{ marginTop: 0, marginBottom: 12 }}>Создать задачу</h4>
           {subjectsError && (
-            <p style={{ color: "var(--danger)", marginTop: 0 }}>{subjectsError}</p>
+            <p style={{ color: "var(--danger)", marginTop: 0 }}>
+              {subjectsError}
+            </p>
           )}
           {groupsError && (
-            <p style={{ color: "var(--danger)", marginTop: 0 }}>{groupsError}</p>
+            <p style={{ color: "var(--danger)", marginTop: 0 }}>
+              {groupsError}
+            </p>
           )}
           <div
             style={{
@@ -487,17 +538,25 @@ const TaskList: React.FC<TaskListProps> = ({
               gap: 12,
             }}
           >
-            <label className="form-group" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <label
+              className="form-group"
+              style={{ display: "flex", flexDirection: "column", gap: 6 }}
+            >
               <span>Название</span>
               <input
                 type="text"
                 value={form.title}
-                onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
+                onChange={(e) =>
+                  setForm((prev) => ({ ...prev, title: e.target.value }))
+                }
                 placeholder="Например, Основы REST API"
                 required
               />
             </label>
-            <label className="form-group" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <label
+              className="form-group"
+              style={{ display: "flex", flexDirection: "column", gap: 6 }}
+            >
               <span>Описание</span>
               <input
                 type="text"
@@ -509,7 +568,10 @@ const TaskList: React.FC<TaskListProps> = ({
                 required
               />
             </label>
-            <label className="form-group" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <label
+              className="form-group"
+              style={{ display: "flex", flexDirection: "column", gap: 6 }}
+            >
               <span>Дедлайн</span>
               <input
                 type="date"
@@ -519,7 +581,10 @@ const TaskList: React.FC<TaskListProps> = ({
                 }
               />
             </label>
-            <label className="form-group" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <label
+              className="form-group"
+              style={{ display: "flex", flexDirection: "column", gap: 6 }}
+            >
               <span>Статус</span>
               <select
                 value={form.status}
@@ -536,7 +601,10 @@ const TaskList: React.FC<TaskListProps> = ({
                 <option value="CLOSED">Закрыта</option>
               </select>
             </label>
-            <label className="form-group" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <label
+              className="form-group"
+              style={{ display: "flex", flexDirection: "column", gap: 6 }}
+            >
               <span>Группа (опционально)</span>
               <select
                 value={form.groupId}
@@ -549,8 +617,8 @@ const TaskList: React.FC<TaskListProps> = ({
                   {groupsLoading
                     ? "Загружаем..."
                     : groups.length === 0
-                      ? "Нет доступных групп"
-                      : "Не выбрано"}
+                    ? "Нет доступных групп"
+                    : "Не выбрано"}
                 </option>
                 {groups.map((group) => (
                   <option key={group.id} value={String(group.id)}>
@@ -559,12 +627,17 @@ const TaskList: React.FC<TaskListProps> = ({
                 ))}
               </select>
               {!groupsLoading && groups.length === 0 && (
-                <span style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
+                <span
+                  style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}
+                >
                   Группы в системе пока не созданы.
                 </span>
               )}
             </label>
-            <label className="form-group" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <label
+              className="form-group"
+              style={{ display: "flex", flexDirection: "column", gap: 6 }}
+            >
               <span>Предмет (опционально)</span>
               <select
                 value={form.subjectId}
@@ -589,18 +662,29 @@ const TaskList: React.FC<TaskListProps> = ({
                   </option>
                 ))}
               </select>
-              {currentRole === "teacher" && !subjectsLoading && subjects.length === 0 && (
-                <span style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
-                  В вашей карточке не привязано ни одного предмета. Добавьте предметы в профиле, чтобы назначать их задачам.
-                </span>
-              )}
+              {currentRole === "teacher" &&
+                !subjectsLoading &&
+                subjects.length === 0 && (
+                  <span
+                    style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}
+                  >
+                    В вашей карточке не привязано ни одного предмета. Добавьте
+                    предметы в профиле, чтобы назначать их задачам.
+                  </span>
+                )}
             </label>
           </div>
           {formError && (
-            <div style={{ color: "var(--danger)", marginTop: 8 }}>{formError}</div>
+            <div style={{ color: "var(--danger)", marginTop: 8 }}>
+              {formError}
+            </div>
           )}
           <div style={{ marginTop: 12 }}>
-            <button className="btn btn-primary" type="submit" disabled={isSubmitting}>
+            <button
+              className="btn btn-primary"
+              type="submit"
+              disabled={isSubmitting}
+            >
               {isSubmitting ? "Сохраняем..." : "Создать задачу"}
             </button>
           </div>
@@ -608,9 +692,7 @@ const TaskList: React.FC<TaskListProps> = ({
       )}
 
       {rows.length === 0 ? (
-        <p style={{ color: "var(--text-muted)" }}>
-          Задачи пока не найдены.
-        </p>
+        <p style={{ color: "var(--text-muted)" }}>Задачи пока не найдены.</p>
       ) : (
         rows.map((task) => (
           <div className="task-card" key={task.id}>
@@ -635,20 +717,19 @@ const TaskList: React.FC<TaskListProps> = ({
                 )}
               </div>
               <h4>{task.title}</h4>
-              <p style={{ color: "var(--text-muted)" }}>
-                {task.description}
-              </p>
+              <p style={{ color: "var(--text-muted)" }}>{task.description}</p>
               <div className="task-meta">
                 <span>Срок: {task.due}</span>
-                <span>
-                  Автор: {task.createdBy?.fullName ?? "Неизвестно"}
-                </span>
-                {task.subject && (
-                  <span>Предмет: {task.subject.name}</span>
+                <span>Автор: {task.createdBy?.fullName ?? "Неизвестно"}</span>
+                {task.subject && <span>Предмет: {task.subject.name}</span>}
+                {task.status === "IN_REVIEW" && (
+                  <span>
+                    На проверке: {task.reviewStudentName ?? "студент не указан"}
+                  </span>
                 )}
               </div>
             </div>
-              <div className="task-actions">
+            <div className="task-actions">
               {currentRole === "student" ? (
                 <Link
                   href={`/tasks/${task.id}?from=${mode ?? "all"}`}
@@ -676,7 +757,9 @@ const TaskList: React.FC<TaskListProps> = ({
                       disabled={actionLoading === task.id}
                       onClick={() => handleStatusChange(task.id, "IN_REVIEW")}
                     >
-                      {actionLoading === task.id ? "Обновляем..." : "На проверке"}
+                      {actionLoading === task.id
+                        ? "Обновляем..."
+                        : "На проверке"}
                     </button>
                   )}
                   <button
@@ -698,5 +781,3 @@ const TaskList: React.FC<TaskListProps> = ({
 };
 
 export default TaskList;
-
-
