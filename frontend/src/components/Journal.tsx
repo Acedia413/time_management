@@ -8,6 +8,13 @@ type UserListItem = {
   fullName: string;
   roles: string[];
   group?: { id: number; name: string } | null;
+  latestActivity?:
+    | {
+        action: string;
+        details: string | null;
+        createdAt: string;
+      }
+    | null;
 };
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
@@ -57,12 +64,31 @@ const Journal: React.FC = () => {
     fetchUsers();
   }, []);
 
+  const formatStatus = (activity?: UserListItem["latestActivity"]) => {
+    if (!activity) {
+      return "—";
+    }
+    const date = new Date(activity.createdAt);
+    const formattedDate = Number.isNaN(date.getTime())
+      ? ""
+      : date.toLocaleString("ru-RU", {
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+    const baseText = activity.details ?? "Активность зафиксирована";
+    return formattedDate ? `${baseText} — ${formattedDate}` : baseText;
+  };
+
   const rows = useMemo(
     () =>
       users.map((user) => ({
         id: user.id,
         fullName: user.fullName,
         group: user.group?.name ?? "—",
+        status: formatStatus(user.latestActivity),
       })),
     [users],
   );
@@ -96,7 +122,9 @@ const Journal: React.FC = () => {
                   <tr key={user.id}>
                     <td>{user.fullName}</td>
                     <td>{user.group}</td>
-                    <td style={{ color: "var(--text-muted)" }}>—</td>
+                    <td style={{ color: "var(--text-muted)" }}>
+                      {user.status}
+                    </td>
                   </tr>
                 ))}
               </tbody>
