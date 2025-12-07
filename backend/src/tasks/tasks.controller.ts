@@ -65,6 +65,30 @@ export class TasksController {
     return this.tasksService.listAvailableGroups(roles);
   }
 
+  // Получает приоритеты задач
+  @Get('priorities')
+  getTaskPriorities(@Req() req: AuthenticatedRequest) {
+    const userId = req.user?.sub;
+    if (!userId) {
+      throw new UnauthorizedException();
+    }
+    return this.tasksService.getTaskPriorities(userId);
+  }
+
+  // Обновляет приоритет задачи
+  @Patch(':id/priority')
+  updateTaskPriority(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateTaskPriorityDto,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    const userId = req.user?.sub;
+    if (!userId) {
+      throw new UnauthorizedException();
+    }
+    return this.tasksService.updateTaskPriority(userId, id, dto.priority);
+  }
+
   @Get()
   findAll(@Req() req: AuthenticatedRequest): Promise<TaskResponse[]> {
     const userId = req.user?.sub;
@@ -249,28 +273,5 @@ export class TasksController {
       userId,
       roles,
     );
-  }
-  // Получает приоритеты задач
-  @Get('priorities')
-  getTaskPriorities(@Req() req: AuthenticatedRequest) {
-    const userId = req.user?.sub;
-    if (!userId) {
-      throw new UnauthorizedException();
-    }
-    return this.tasksService.getTaskPriorities(userId);
-  }
-
-  // Обновляет приоритет задачи
-  @Patch(':id/priority')
-  updateTaskPriority(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() dto: UpdateTaskPriorityDto,
-    @Req() req: AuthenticatedRequest,
-  ) {
-    const userId = req.user?.sub;
-    if (!userId) {
-      throw new UnauthorizedException();
-    }
-    return this.tasksService.updateTaskPriority(userId, id, dto.priority);
   }
 }

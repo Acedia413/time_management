@@ -5,11 +5,12 @@ import { useCallback, useMemo, useState } from "react";
 import Dashboard from "../components/Dashboard";
 import Header from "../components/Header";
 import Journal from "../components/Journal";
+import PlanView from "../components/PlanView";
+import { useProfile } from "../components/ProfileProvider";
+import SettingsPanel from "../components/SettingsPanel";
 import Sidebar from "../components/Sidebar";
 import TaskList from "../components/TaskList";
 import UserList from "../components/UserList";
-import SettingsPanel from "../components/SettingsPanel";
-import { useProfile } from "../components/ProfileProvider";
 
 export default function Home() {
   const { user, role: profileRole, loading: profileLoading } = useProfile();
@@ -19,7 +20,14 @@ export default function Home() {
   const currentRole = profileRole ?? "student";
   const currentView = useMemo(() => {
     const requestedView = searchParams.get("view");
-    const allowed = ["dashboard", "tasks", "users", "journal", "settings"];
+    const allowed = [
+      "dashboard",
+      "tasks",
+      "users",
+      "journal",
+      "settings",
+      "plan",
+    ];
     return requestedView && allowed.includes(requestedView)
       ? requestedView
       : "dashboard";
@@ -37,7 +45,7 @@ export default function Home() {
         router.push(`/?view=${view}`);
       }
     },
-    [router],
+    [router]
   );
 
   if (profileLoading) {
@@ -98,7 +106,9 @@ export default function Home() {
                 Мои задачи
               </button>
               <button
-                className={`btn ${tasksMode === "teacher" ? "btn-primary" : ""}`}
+                className={`btn ${
+                  tasksMode === "teacher" ? "btn-primary" : ""
+                }`}
                 onClick={() => setTasksMode("teacher")}
               >
                 Задачи преподавателей
@@ -111,7 +121,11 @@ export default function Home() {
             />
           </div>
         ) : (
-          <TaskList currentRole={currentRole} currentUserId={user?.id} mode="all" />
+          <TaskList
+            currentRole={currentRole}
+            currentUserId={user?.id}
+            mode="all"
+          />
         );
       case "users":
         return <UserList />;
@@ -119,6 +133,8 @@ export default function Home() {
         return <Journal />;
       case "settings":
         return <SettingsPanel />;
+      case "plan":
+        return <PlanView currentRole={currentRole} currentUserId={user?.id} />;
       default:
         return (
           <div className="card">

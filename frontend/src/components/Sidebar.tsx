@@ -67,6 +67,17 @@ const Sidebar: React.FC<SidebarProps> = ({
           <span className="nav-icon">🗒️</span> Задачи
         </a>
 
+        <a
+          href="#"
+          className={`nav-item ${currentView === "plan" ? "active" : ""}`}
+          onClick={(e) => {
+            e.preventDefault();
+            navigate("plan");
+          }}
+        >
+          <span className="nav-icon">📋</span> План
+        </a>
+
         {isVisible(["teacher", "admin"]) && (
           <a
             href="#"

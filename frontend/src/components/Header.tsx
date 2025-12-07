@@ -26,7 +26,7 @@ const Header: React.FC<HeaderProps> = ({
   currentView,
 }) => {
   const headerContent =
-    viewTitles[currentView] ?? { title: "Раздел", subtitle: "" };
+    viewTitles[currentView] ?? { title: "Планировщик задач", subtitle: "" };
 
   return (
     <div className="header">
