@@ -7,6 +7,8 @@ RUN npm ci
 
 FROM node:20-alpine AS builder
 WORKDIR /app
+ARG NEXT_PUBLIC_API_URL=http://localhost:3001
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npm run build
@@ -15,7 +17,8 @@ RUN npm prune --omit=dev
 FROM node:20-alpine AS production
 WORKDIR /app
 ENV NODE_ENV=production
-ENV NEXT_PUBLIC_API_URL=http://localhost:3001
+ARG NEXT_PUBLIC_API_URL=http://localhost:3001
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV PORT=3000
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/.next ./.next
