@@ -1,19 +1,12 @@
 # syntax=docker/dockerfile:1.7
 
-FROM node:20-alpine AS deps
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci
-
 FROM node:20-alpine AS builder
 WORKDIR /app
 ARG PRISMA_DB_URL="postgresql://postgres:postgres@localhost:5432/postgres"
 ENV DATABASE_URL=$PRISMA_DB_URL
-COPY --from=deps /app/node_modules ./node_modules
 COPY package*.json ./
-COPY prisma ./prisma
-COPY nest-cli.json tsconfig*.json ./
-COPY src ./src
+RUN npm ci
+COPY . .
 RUN npx prisma generate
 RUN npm run build
 RUN npm prune --omit=dev
