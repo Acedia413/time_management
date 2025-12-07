@@ -31,6 +31,10 @@ import { UpdateTaskStatusDto } from './dto/update-task-status.dto';
 type AuthenticatedRequest = Request & {
   user?: { sub: number; roles?: string[] };
 };
+type UploadedFile = {
+  originalname?: string | null;
+  filename: string;
+};
 // Контроллер задач
 @UseGuards(JwtAuthGuard)
 @Controller('tasks')
@@ -48,6 +52,16 @@ export class TasksController {
       throw new UnauthorizedException();
     }
     return this.tasksService.findGroupsForTeacher(userId, roles);
+  }
+
+  @Get('available-groups')
+  listAvailableGroups(@Req() req: AuthenticatedRequest) {
+    const userId = req.user?.sub;
+    const roles = req.user?.roles ?? [];
+    if (!userId) {
+      throw new UnauthorizedException();
+    }
+    return this.tasksService.listAvailableGroups(roles);
   }
 
   @Get()
@@ -174,9 +188,14 @@ export class TasksController {
     FileInterceptor('file', {
       storage: diskStorage({
         destination: './uploads',
-        filename: (_req, file, cb) => {
+        filename: (
+          _req,
+          file: UploadedFile,
+          cb: (error: Error | null, filename: string) => void,
+        ) => {
           const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-          const ext = extname(file.originalname);
+          const originalName = file.originalname ?? '';
+          const ext = extname(originalName);
           cb(null, `${uniqueSuffix}${ext}`);
         },
       }),
@@ -184,8 +203,8 @@ export class TasksController {
   )
   uploadSubmission(
     @Param('id', ParseIntPipe) id: number,
-    @UploadedFile() file: any,
     @Req() req: AuthenticatedRequest,
+    @UploadedFile() file?: UploadedFile,
   ) {
     const userId = req.user?.sub;
     const roles = req.user?.roles ?? [];
@@ -210,6 +229,11 @@ export class TasksController {
     if (!userId) {
       throw new UnauthorizedException();
     }
-    return this.tasksService.deleteSubmission(taskId, submissionId, userId, roles);
+    return this.tasksService.deleteSubmission(
+      taskId,
+      submissionId,
+      userId,
+      roles,
+    );
   }
 }

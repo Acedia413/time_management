@@ -30,9 +30,7 @@ export class DepartmentsService {
     });
   }
 
-  async create(
-    dto: CreateDepartmentDto,
-  ): Promise<DepartmentResponse> {
+  async create(dto: CreateDepartmentDto): Promise<DepartmentResponse> {
     const name = dto.name?.trim();
 
     if (!name) {
@@ -67,9 +65,7 @@ export class DepartmentsService {
     if (typeof dto.name !== 'undefined') {
       const trimmed = dto.name?.trim();
       if (!trimmed) {
-        throw new BadRequestException(
-          'Название кафедры не может быть пустым.',
-        );
+        throw new BadRequestException('Название кафедры не может быть пустым.');
       }
 
       data.name = trimmed;

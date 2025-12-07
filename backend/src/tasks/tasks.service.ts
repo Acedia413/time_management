@@ -46,6 +46,8 @@ export type TeacherGroupStudentsResponse = {
   students: { id: number; fullName: string }[];
 };
 
+type SimpleGroupResponse = { id: number; name: string };
+
 type TaskWithRelations = {
   id: number;
   title: string;
@@ -136,9 +138,32 @@ export class TasksService {
       })),
     }));
   }
+
+  async listAvailableGroups(roles: string[]): Promise<SimpleGroupResponse[]> {
+    const normalizedRoles = roles.map((r) => r.toUpperCase()) as RoleName[];
+    const isTeacherOrAdmin = normalizedRoles.some(
+      (role) => role === RoleName.TEACHER || role === RoleName.ADMIN,
+    );
+
+    if (!isTeacherOrAdmin) {
+      throw new ForbiddenException('Access denied');
+    }
+
+    const groups = await this.prisma.group.findMany({
+      select: { id: true, name: true },
+      orderBy: { name: 'asc' },
+    });
+
+    return groups;
+  }
   // Отдает все доступные пользователю задачи
-  async findAllForUser(userId: number, roles: string[]): Promise<TaskResponse[]> {
-    const isStudent = roles.map((r) => r.toUpperCase()).includes(RoleName.STUDENT);
+  async findAllForUser(
+    userId: number,
+    roles: string[],
+  ): Promise<TaskResponse[]> {
+    const isStudent = roles
+      .map((r) => r.toUpperCase())
+      .includes(RoleName.STUDENT);
     let groupId: number | null = null;
 
     if (isStudent) {
@@ -240,7 +265,9 @@ export class TasksService {
     userId: number,
     roles: string[],
   ): Promise<TaskResponse> {
-    const isStudent = roles.map((r) => r.toUpperCase()).includes(RoleName.STUDENT);
+    const isStudent = roles
+      .map((r) => r.toUpperCase())
+      .includes(RoleName.STUDENT);
     let userGroupId: number | null = null;
 
     if (isStudent) {
@@ -272,7 +299,8 @@ export class TasksService {
 
     if (isStudent) {
       const allowed =
-        task.groupId === null || (userGroupId !== null && task.groupId === userGroupId);
+        task.groupId === null ||
+        (userGroupId !== null && task.groupId === userGroupId);
       if (!allowed) {
         throw new ForbiddenException('Недостаточно прав для просмотра задачи.');
       }
@@ -399,8 +427,7 @@ export class TasksService {
         ? null
         : Number(dto.subjectId);
     if (subjectIdRaw !== null) {
-      const isValidSubject =
-        Number.isInteger(subjectIdRaw) && subjectIdRaw > 0;
+      const isValidSubject = Number.isInteger(subjectIdRaw) && subjectIdRaw > 0;
       if (!isValidSubject) {
         throw new BadRequestException('Некорректный идентификатор предмета.');
       }

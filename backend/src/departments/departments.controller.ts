@@ -28,12 +28,9 @@ export class DepartmentsController {
   findAll() {
     return this.departmentsService.findAll();
   }
-  // Добавление Кафедры 
+  // Добавление Кафедры
   @Post()
-  create(
-    @Body() dto: CreateDepartmentDto,
-    @Req() req: AuthenticatedRequest,
-  ) {
+  create(@Body() dto: CreateDepartmentDto, @Req() req: AuthenticatedRequest) {
     this.ensureAdmin(req);
     return this.departmentsService.create(dto);
   }

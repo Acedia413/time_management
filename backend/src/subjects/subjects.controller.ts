@@ -20,7 +20,9 @@ import { CreateSubjectDto } from './dto/create-subject.dto';
 import { UpdateSubjectDto } from './dto/update-subject.dto';
 import { Request } from 'express';
 
-type AuthenticatedRequest = Request & { user?: { sub?: number; roles?: string[] } };
+type AuthenticatedRequest = Request & {
+  user?: { sub?: number; roles?: string[] };
+};
 @UseGuards(JwtAuthGuard)
 @Controller('subjects')
 export class SubjectsController {
@@ -32,9 +34,7 @@ export class SubjectsController {
       throw new BadRequestException('Некорректный идентификатор кафедры.');
     }
 
-    const parsedDepartmentId = departmentId
-      ? Number(departmentId)
-      : undefined;
+    const parsedDepartmentId = departmentId ? Number(departmentId) : undefined;
 
     return this.subjectsService.findAll(parsedDepartmentId);
   }
@@ -61,10 +61,7 @@ export class SubjectsController {
   }
   // Добавление предмета
   @Post()
-  create(
-    @Body() dto: CreateSubjectDto,
-    @Req() req: AuthenticatedRequest,
-  ) {
+  create(@Body() dto: CreateSubjectDto, @Req() req: AuthenticatedRequest) {
     this.ensureAdmin(req);
     return this.subjectsService.create(dto);
   }

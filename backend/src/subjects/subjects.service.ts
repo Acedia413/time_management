@@ -44,9 +44,7 @@ export class SubjectsService {
     }
 
     if (!Number.isInteger(departmentId) || departmentId <= 0) {
-      throw new BadRequestException(
-        'Некорректный идентификатор кафедры.',
-      );
+      throw new BadRequestException('Некорректный идентификатор кафедры.');
     }
 
     try {
@@ -75,10 +73,7 @@ export class SubjectsService {
     }
   }
 
-  async update(
-    id: number,
-    dto: UpdateSubjectDto,
-  ): Promise<SubjectListItem> {
+  async update(id: number, dto: UpdateSubjectDto): Promise<SubjectListItem> {
     const data: { name?: string; departmentId?: number } = {};
 
     if (typeof dto.name !== 'undefined') {
@@ -94,9 +89,7 @@ export class SubjectsService {
     if (typeof dto.departmentId !== 'undefined') {
       const departmentId = Number(dto.departmentId);
       if (!Number.isInteger(departmentId) || departmentId <= 0) {
-        throw new BadRequestException(
-          'Некорректный идентификатор кафедры.',
-        );
+        throw new BadRequestException('Некорректный идентификатор кафедры.');
       }
       data.departmentId = departmentId;
     }

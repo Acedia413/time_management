@@ -43,7 +43,7 @@ export class UsersService {
 
   // Получение списка студентов и преподавателей
   async findStudentsAndTeachers(): Promise<UserResponse[]> {
-    const users = (await this.prisma.user.findMany({
+    const users = await this.prisma.user.findMany({
       where: {
         roles: {
           some: { name: { in: [RoleName.STUDENT, RoleName.TEACHER] } },
@@ -51,16 +51,16 @@ export class UsersService {
       },
       include: this.userInclude,
       orderBy: [{ fullName: 'asc' }, { id: 'asc' }],
-    })) as UserWithRelations[];
+    });
 
     return users.map((user) => this.mapUser(user));
   }
   // Получение пользователя по ID
   async findOne(id: number): Promise<UserResponse> {
-    const user = (await this.prisma.user.findUnique({
+    const user = await this.prisma.user.findUnique({
       where: { id },
       include: this.userInclude,
-    })) as UserWithRelations | null;
+    });
 
     if (!user) {
       throw new NotFoundException('Пользователь не найден.');
@@ -88,7 +88,7 @@ export class UsersService {
     const groupRelation = this.buildConnectRelation(data.groupId, 'group');
 
     try {
-      const user = (await this.prisma.user.create({
+      const user = await this.prisma.user.create({
         data: {
           username: data.username,
           password: data.password,
@@ -99,7 +99,7 @@ export class UsersService {
           ...(subjectsRelation ? { subjects: subjectsRelation } : {}),
         },
         include: this.userInclude,
-      })) as UserWithRelations;
+      });
 
       return this.mapUser(user);
     } catch (err) {
@@ -125,10 +125,7 @@ export class UsersService {
   }
 
   // Обновление пользователя
-  async updateUser(
-    id: number,
-    dto: UpdateUserDto,
-  ): Promise<UserResponse> {
+  async updateUser(id: number, dto: UpdateUserDto): Promise<UserResponse> {
     if (
       typeof dto.fullName === 'undefined' &&
       typeof dto.password === 'undefined' &&
@@ -144,18 +141,14 @@ export class UsersService {
     if (typeof dto.fullName !== 'undefined') {
       const fullName = dto.fullName.trim();
       if (!fullName) {
-        throw new BadRequestException(
-          'ФИО не может быть пустым.',
-        );
+        throw new BadRequestException('ФИО не может быть пустым.');
       }
       dataToUpdate.fullName = fullName;
     }
 
     if (typeof dto.password !== 'undefined') {
       if (!dto.password.trim()) {
-        throw new BadRequestException(
-          'Пароль не может быть пустым.',
-        );
+        throw new BadRequestException('Пароль не может быть пустым.');
       }
       dataToUpdate.password = dto.password;
     }
@@ -181,11 +174,11 @@ export class UsersService {
     }
 
     try {
-      const user = (await this.prisma.user.update({
+      const user = await this.prisma.user.update({
         where: { id },
         data: dataToUpdate,
         include: this.userInclude,
-      })) as UserWithRelations;
+      });
 
       return this.mapUser(user);
     } catch (err) {
@@ -234,10 +227,7 @@ export class UsersService {
   private buildUpdateRelation(
     value: number | null | undefined,
     field: 'group' | 'department',
-  ):
-    | { connect: { id: number } }
-    | { disconnect: true }
-    | undefined {
+  ): { connect: { id: number } } | { disconnect: true } | undefined {
     if (typeof value === 'undefined') {
       return undefined;
     }
@@ -257,17 +247,13 @@ export class UsersService {
     const parsed = Number(value);
     if (!Number.isInteger(parsed) || parsed <= 0) {
       const fieldName = field === 'group' ? 'группы' : 'кафедры';
-      throw new BadRequestException(
-        `Некорректный идентификатор ${fieldName}.`,
-      );
+      throw new BadRequestException(`Некорректный идентификатор ${fieldName}.`);
     }
 
     return parsed;
   }
 
-  private normalizeSubjectIds(
-    subjectIds?: number[],
-  ): number[] | undefined {
+  private normalizeSubjectIds(subjectIds?: number[]): number[] | undefined {
     if (typeof subjectIds === 'undefined') {
       return undefined;
     }
@@ -285,9 +271,7 @@ export class UsersService {
         (subjectId) => !Number.isInteger(subjectId) || subjectId <= 0,
       )
     ) {
-      throw new BadRequestException(
-        'Некорректный идентификатор предмета.',
-      );
+      throw new BadRequestException('Некорректный идентификатор предмета.');
     }
 
     return Array.from(new Set(normalized));

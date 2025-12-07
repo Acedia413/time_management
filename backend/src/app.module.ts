@@ -10,7 +10,6 @@ import { DepartmentsModule } from './departments/departments.module';
 import { SubjectsModule } from './subjects/subjects.module';
 import { TasksModule } from './tasks/tasks.module';
 
-
 @Module({
   imports: [
     ServeStaticModule.forRoot({
