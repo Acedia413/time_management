@@ -20,6 +20,7 @@ import { extname } from 'path';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CreateSubmissionDto } from './dto/create-submission.dto';
 import { CreateTaskDto } from './dto/create-task.dto';
+import { UpdateTaskPriorityDto } from './dto/update-task-priority.dto';
 import { UpdateTaskStatusDto } from './dto/update-task-status.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import {
@@ -248,5 +249,28 @@ export class TasksController {
       userId,
       roles,
     );
+  }
+  // Получает приоритеты задач
+  @Get('priorities')
+  getTaskPriorities(@Req() req: AuthenticatedRequest) {
+    const userId = req.user?.sub;
+    if (!userId) {
+      throw new UnauthorizedException();
+    }
+    return this.tasksService.getTaskPriorities(userId);
+  }
+
+  // Обновляет приоритет задачи
+  @Patch(':id/priority')
+  updateTaskPriority(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateTaskPriorityDto,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    const userId = req.user?.sub;
+    if (!userId) {
+      throw new UnauthorizedException();
+    }
+    return this.tasksService.updateTaskPriority(userId, id, dto.priority);
   }
 }

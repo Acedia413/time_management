@@ -689,4 +689,38 @@ export class TasksService {
     await this.prisma.task.delete({ where: { id: taskId } });
     return { success: true as const };
   }
+
+  // Получение приоритетов задач
+  async getTaskPriorities(
+    userId: number,
+  ): Promise<{ taskId: number; priority: number }[]> {
+    const priorities = await this.prisma.taskPriority.findMany({
+      where: { userId },
+      select: { taskId: true, priority: true },
+      orderBy: { priority: 'asc' },
+    });
+    return priorities;
+  }
+
+  // Обновление приоритета задачи
+  async updateTaskPriority(
+    userId: number,
+    taskId: number,
+    priority: number,
+  ): Promise<{ taskId: number; priority: number }> {
+    const task = await this.prisma.task.findUnique({
+      where: { id: taskId },
+    });
+    if (!task) {
+      throw new NotFoundException('Задача не найдена.');
+    }
+
+    const saved = await this.prisma.taskPriority.upsert({
+      where: { userId_taskId: { userId, taskId } },
+      update: { priority },
+      create: { userId, taskId, priority },
+      select: { taskId: true, priority: true },
+    });
+    return saved;
+  }
 }
