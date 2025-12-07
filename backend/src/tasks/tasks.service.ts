@@ -403,8 +403,8 @@ export class TasksService {
     roles: string[],
     dto: CreateSubmissionDto,
   ): Promise<SubmissionResponse> {
-    // Проверяем доступ к задаче
-    await this.findOneForUser(taskId, userId, roles);
+
+    const task = await this.findOneForUser(taskId, userId, roles);
 
     const data = {
       content: dto.content ?? null,
@@ -419,6 +419,14 @@ export class TasksService {
       update: data,
       create: data,
       include: { student: { select: { id: true, fullName: true } } },
+    });
+
+    await this.prisma.activityLog.create({
+      data: {
+        userId,
+        action: 'SUBMISSION_SENT',
+        details: `Ответ на задачу "${task.title}" отправлен`,
+      },
     });
 
     return {

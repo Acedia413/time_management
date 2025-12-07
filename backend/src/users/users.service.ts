@@ -28,6 +28,11 @@ export type UserResponse = {
   group: { id: number; name: string } | null;
   department: { id: number; name: string } | null;
   subjects: { id: number; name: string }[];
+  latestActivity: {
+    action: string;
+    details: string | null;
+    createdAt: Date;
+  } | null;
 };
 
 @Injectable()
@@ -53,7 +58,8 @@ export class UsersService {
       orderBy: [{ fullName: 'asc' }, { id: 'asc' }],
     });
 
-    return users.map((user) => this.mapUser(user));
+    const mapped = users.map((user) => this.mapUser(user));
+    return this.attachLatestActivities(mapped);
   }
   // Получение пользователя по ID
   async findOne(id: number): Promise<UserResponse> {
@@ -307,6 +313,41 @@ export class UsersService {
     return Array.from(new Set(normalized));
   }
 
+  private async attachLatestActivities(
+    users: UserResponse[],
+  ): Promise<UserResponse[]> {
+    const studentIds = users
+      .filter((user) => user.roles.includes(RoleName.STUDENT))
+      .map((user) => user.id);
+
+    if (!studentIds.length) {
+      return users;
+    }
+
+    const latestLogs = await this.prisma.activityLog.findMany({
+      where: { userId: { in: studentIds } },
+      orderBy: [{ userId: 'asc' }, { createdAt: 'desc' }],
+      distinct: ['userId'],
+    });
+
+    const activityMap = new Map(
+      latestLogs.map((log) => [
+        log.userId,
+        {
+          action: log.action,
+          details: log.details,
+          createdAt: log.createdAt,
+        },
+      ]),
+    );
+
+    return users.map((user) =>
+      activityMap.has(user.id)
+        ? { ...user, latestActivity: activityMap.get(user.id) ?? null }
+        : user,
+    );
+  }
+
   private mapUser(user: UserWithRelations): UserResponse {
     return {
       id: user.id,
@@ -321,6 +362,7 @@ export class UsersService {
         id: subject.id,
         name: subject.name,
       })),
+      latestActivity: null,
     };
   }
 }

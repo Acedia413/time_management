@@ -43,6 +43,16 @@ model User {
   tasksReviewing Task[]         @relation("TasksReviewing")
   submissions    Submission[]
   taskPriorities TaskPriority[]
+  activities     ActivityLog[]
+}
+
+model ActivityLog {
+  id        Int      @id @default(autoincrement())
+  action    String
+  details   String?
+  createdAt DateTime @default(now())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
 }
 
 model Role {
@@ -53,19 +63,19 @@ model Role {
 }
 
 model Department {
-  id        Int       @id @default(autoincrement())
-  name      String    @unique
-  subjects  Subject[]
-  teachers  User[]
+  id       Int       @id @default(autoincrement())
+  name     String    @unique
+  subjects Subject[]
+  teachers User[]
 }
 
 model Subject {
-  id            Int         @id @default(autoincrement())
-  name          String
-  departmentId  Int
-  department    Department  @relation(fields: [departmentId], references: [id], onDelete: Cascade)
-  teachers      User[]
-  tasks         Task[]
+  id           Int        @id @default(autoincrement())
+  name         String
+  departmentId Int
+  department   Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  teachers     User[]
+  tasks        Task[]
 
   @@unique([name, departmentId])
 }
@@ -84,15 +94,15 @@ model Permission {
 }
 
 model Task {
-  id          Int          @id @default(autoincrement())
-  title       String
-  description String
-  createdAt   DateTime     @default(now())
-  status      TaskStatus   @default(ACTIVE)
-  dueDate     DateTime?
-  createdById Int
-  groupId     Int?
-  subjectId   Int?
+  id                Int            @id @default(autoincrement())
+  title             String
+  description       String
+  createdAt         DateTime       @default(now())
+  status            TaskStatus     @default(ACTIVE)
+  dueDate           DateTime?
+  createdById       Int
+  groupId           Int?
+  subjectId         Int?
   inReviewStudentId Int?
   createdBy         User           @relation("TasksCreated", fields: [createdById], references: [id])
   group             Group?         @relation(fields: [groupId], references: [id])
