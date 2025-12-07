@@ -26,6 +26,8 @@ const initialStats: UserStats = {
 const Dashboard: React.FC<DashboardProps> = ({ currentRole, onNavigate }) => {
   const [userStats, setUserStats] = useState<UserStats>(initialStats);
   const [isUserStatsLoading, setIsUserStatsLoading] = useState(false);
+  const [tasksCount, setTasksCount] = useState<number | null>(null);
+  const [isTasksCountLoading, setIsTasksCountLoading] = useState(false);
 
   const apiUrl =
     process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
@@ -34,6 +36,8 @@ const Dashboard: React.FC<DashboardProps> = ({ currentRole, onNavigate }) => {
     if (currentRole !== "admin") {
       setUserStats(initialStats);
       setIsUserStatsLoading(false);
+      setTasksCount(null);
+      setIsTasksCountLoading(false);
       return;
     }
 
@@ -97,6 +101,58 @@ const Dashboard: React.FC<DashboardProps> = ({ currentRole, onNavigate }) => {
     };
 
     load();
+    return () => {
+      aborted = true;
+    };
+  }, [apiUrl, currentRole]);
+
+  useEffect(() => {
+    if (currentRole !== "admin") {
+      setTasksCount(null);
+      setIsTasksCountLoading(false);
+      return;
+    }
+
+    const token = localStorage.getItem("token");
+    if (!token) {
+      setTasksCount(null);
+      setIsTasksCountLoading(false);
+      return;
+    }
+
+    let aborted = false;
+    setIsTasksCountLoading(true);
+
+    const loadTasks = async () => {
+      try {
+        const response = await fetch(`${apiUrl}/tasks`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (!response.ok) {
+          throw new Error("failed");
+        }
+
+        const data = await response.json();
+        if (!Array.isArray(data)) {
+          throw new Error("invalid");
+        }
+
+        if (!aborted) {
+          setTasksCount(data.length);
+        }
+      } catch {
+        if (!aborted) {
+          setTasksCount(null);
+        }
+      } finally {
+        if (!aborted) {
+          setIsTasksCountLoading(false);
+        }
+      }
+    };
+
+    loadTasks();
     return () => {
       aborted = true;
     };
@@ -219,7 +275,9 @@ const Dashboard: React.FC<DashboardProps> = ({ currentRole, onNavigate }) => {
           </div>
           <div className="card stat-card">
             <h3>Задач в системе</h3>
-            <div className="value">850</div>
+            <div className="value">
+              {isTasksCountLoading ? "..." : tasksCount ?? "-"}
+            </div>
           </div>
           <div className="card stat-card">
             <h3>Статус системы</h3>

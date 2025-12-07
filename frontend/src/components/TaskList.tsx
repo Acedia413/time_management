@@ -3,10 +3,13 @@
 import React, { useEffect, useMemo, useState, useCallback } from "react";
 import Link from "next/link";
 
+type CreatorRoleFilter = "teacher" | "admin";
+
 interface TaskListProps {
   currentRole: string;
   currentUserId?: number;
   mode?: "all" | "my" | "teacher";
+  creatorRoleFilter?: CreatorRoleFilter;
 }
 
 type TaskItem = {
@@ -33,6 +36,10 @@ type SubjectOption = {
   id: number;
   name: string;
 };
+type GroupOption = {
+  id: number;
+  name: string;
+};
 // Подписи и стили для статусов задач
 const statusLabels: Record<string, string> = {
   DRAFT: "Черновик",
@@ -48,7 +55,12 @@ const statusClass: Record<string, string> = {
   CLOSED: "badge-done",
 };
 // Загружаю задачи с учетом токена и подготавливаю данные для отображения
-const TaskList: React.FC<TaskListProps> = ({ currentRole, currentUserId, mode = "all" }) => {
+const TaskList: React.FC<TaskListProps> = ({
+  currentRole,
+  currentUserId,
+  mode = "all",
+  creatorRoleFilter,
+}) => {
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -67,6 +79,9 @@ const TaskList: React.FC<TaskListProps> = ({ currentRole, currentUserId, mode = 
   const [subjects, setSubjects] = useState<SubjectOption[]>([]);
   const [subjectsLoading, setSubjectsLoading] = useState(false);
   const [subjectsError, setSubjectsError] = useState<string | null>(null);
+  const [groups, setGroups] = useState<GroupOption[]>([]);
+  const [groupsLoading, setGroupsLoading] = useState(false);
+  const [groupsError, setGroupsError] = useState<string | null>(null);
 
   const apiUrl =
     process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
@@ -112,26 +127,36 @@ const TaskList: React.FC<TaskListProps> = ({ currentRole, currentUserId, mode = 
     [apiUrl],
   );
   const viewTasks = useMemo(() => {
+    let scoped = tasks;
     if (mode === "my" && currentUserId) {
       if (currentRole === "teacher") {
-        return tasks.filter(
+        scoped = tasks.filter(
           (task) =>
             task.createdBy?.id === currentUserId || task.status === "IN_REVIEW",
         );
+      } else {
+        scoped = tasks.filter((task) => task.createdBy?.id === currentUserId);
       }
-      return tasks.filter((task) => task.createdBy?.id === currentUserId);
-    }
-    if (currentRole === "teacher" && currentUserId) {
-      return tasks.filter(
+    } else if (currentRole === "teacher" && currentUserId) {
+      scoped = tasks.filter(
         (task) =>
           task.createdBy?.id === currentUserId || isAdminTask(task),
       );
+    } else if (mode === "teacher" && currentRole === "student" && currentUserId) {
+      scoped = tasks.filter((task) => task.createdBy?.id !== currentUserId);
     }
-    if (mode === "teacher" && currentRole === "student" && currentUserId) {
-      return tasks.filter((task) => task.createdBy?.id !== currentUserId);
+
+    if (!creatorRoleFilter) {
+      return scoped;
     }
-    return tasks;
-  }, [tasks, mode, currentUserId, currentRole]);
+
+    const requiredRole = creatorRoleFilter.toUpperCase();
+    return scoped.filter((task) =>
+      task.createdBy?.roles?.some(
+        (role) => role?.toUpperCase?.() === requiredRole,
+      ),
+    );
+  }, [tasks, mode, currentUserId, currentRole, creatorRoleFilter]);
   // Подготавливаю статистику для отображения
   const stats = useMemo(() => {
     const total = viewTasks.length;
@@ -150,6 +175,8 @@ const TaskList: React.FC<TaskListProps> = ({ currentRole, currentUserId, mode = 
     if (currentRole !== "teacher" && currentRole !== "admin") {
       setSubjects([]);
       setSubjectsError(null);
+      setGroups([]);
+      setGroupsError(null);
       return;
     }
     const token = localStorage.getItem("token");
@@ -183,6 +210,42 @@ const TaskList: React.FC<TaskListProps> = ({ currentRole, currentUserId, mode = 
       })
       .finally(() => {
         setSubjectsLoading(false);
+      });
+  }, [apiUrl, currentRole]);
+
+  useEffect(() => {
+    if (currentRole !== "teacher" && currentRole !== "admin") {
+      setGroups([]);
+      setGroupsError(null);
+      return;
+    }
+    const token = localStorage.getItem("token");
+    if (!token) {
+      setGroupsError("Требуется авторизация. Перелогиньтесь.");
+      return;
+    }
+    setGroupsLoading(true);
+    setGroupsError(null);
+    fetch(`${apiUrl}/tasks/available-groups`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error("Не удалось загрузить список групп.");
+        }
+        const data = await response.json();
+        const normalized = Array.isArray(data)
+          ? [...data].sort((a, b) => a.name.localeCompare(b.name, "ru"))
+          : [];
+        setGroups(normalized);
+      })
+      .catch((err) => {
+        setGroupsError(
+          err instanceof Error ? err.message : "Ошибка загрузки групп.",
+        );
+      })
+      .finally(() => {
+        setGroupsLoading(false);
       });
   }, [apiUrl, currentRole]);
 
@@ -414,6 +477,9 @@ const TaskList: React.FC<TaskListProps> = ({ currentRole, currentUserId, mode = 
           {subjectsError && (
             <p style={{ color: "var(--danger)", marginTop: 0 }}>{subjectsError}</p>
           )}
+          {groupsError && (
+            <p style={{ color: "var(--danger)", marginTop: 0 }}>{groupsError}</p>
+          )}
           <div
             style={{
               display: "grid",
@@ -471,15 +537,32 @@ const TaskList: React.FC<TaskListProps> = ({ currentRole, currentUserId, mode = 
               </select>
             </label>
             <label className="form-group" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <span>ID группы (опционально)</span>
-              <input
-                type="text"
+              <span>Группа (опционально)</span>
+              <select
                 value={form.groupId}
                 onChange={(e) =>
                   setForm((prev) => ({ ...prev, groupId: e.target.value }))
                 }
-                placeholder="Например, 1"
-              />
+                disabled={groupsLoading || groups.length === 0}
+              >
+                <option value="">
+                  {groupsLoading
+                    ? "Загружаем..."
+                    : groups.length === 0
+                      ? "Нет доступных групп"
+                      : "Не выбрано"}
+                </option>
+                {groups.map((group) => (
+                  <option key={group.id} value={String(group.id)}>
+                    {group.name} (ID {group.id})
+                  </option>
+                ))}
+              </select>
+              {!groupsLoading && groups.length === 0 && (
+                <span style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
+                  Группы в системе пока не созданы.
+                </span>
+              )}
             </label>
             <label className="form-group" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               <span>Предмет (опционально)</span>

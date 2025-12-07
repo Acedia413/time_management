@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import Dashboard from "../components/Dashboard";
 import Header from "../components/Header";
 import Journal from "../components/Journal";
@@ -11,45 +11,34 @@ import UserList from "../components/UserList";
 import SettingsPanel from "../components/SettingsPanel";
 import { useProfile } from "../components/ProfileProvider";
 
-type UserProfile = {
-  id: number;
-  username: string;
-  fullName: string;
-  roles: string[];
-  group?: { id: number; name: string } | null;
-};
-
 export default function Home() {
   const { user, role: profileRole, loading: profileLoading } = useProfile();
-  const [currentRole, setCurrentRole] = useState("student");
-  const [currentView, setCurrentView] = useState("dashboard");
   const [tasksMode, setTasksMode] = useState<"all" | "my" | "teacher">("all");
   const router = useRouter();
   const searchParams = useSearchParams();
-
-  useEffect(() => {
+  const currentRole = profileRole ?? "student";
+  const currentView = useMemo(() => {
     const requestedView = searchParams.get("view");
-    if (
-      requestedView &&
-      ["dashboard", "tasks", "users", "journal", "settings"].includes(
-        requestedView,
-      )
-    ) {
-      setCurrentView(requestedView);
-    }
+    const allowed = ["dashboard", "tasks", "users", "journal", "settings"];
+    return requestedView && allowed.includes(requestedView)
+      ? requestedView
+      : "dashboard";
   }, [searchParams]);
 
-  useEffect(() => {
-    setCurrentRole(profileRole ?? "student");
-  }, [profileRole]);
-
-  const handleNavigate = (view: string) => {
-    if (view === "tasks") {
-      router.push("/tasks");
-      return;
-    }
-    setCurrentView(view);
-  };
+  const handleNavigate = useCallback(
+    (view: string) => {
+      if (view === "tasks") {
+        router.push("/tasks");
+        return;
+      }
+      if (view === "dashboard") {
+        router.push("/");
+      } else {
+        router.push(`/?view=${view}`);
+      }
+    },
+    [router],
+  );
 
   if (profileLoading) {
     return (
@@ -133,7 +122,7 @@ export default function Home() {
       default:
         return (
           <div className="card">
-            <p>Раздел в разработке...</p>
+            <p>Загрузка...</p>
           </div>
         );
     }

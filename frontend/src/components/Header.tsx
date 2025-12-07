@@ -24,7 +24,6 @@ const viewTitles: Record<string, { title: string; subtitle: string }> = {
 
 const Header: React.FC<HeaderProps> = ({
   currentView,
-  currentRole,
 }) => {
   const headerContent =
     viewTitles[currentView] ?? { title: "Раздел", subtitle: "" };

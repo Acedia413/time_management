@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 type UserProfile = {
@@ -35,7 +35,7 @@ const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ children }) 
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
-  const loadProfile = async () => {
+  const loadProfile = useCallback(async () => {
     const token = localStorage.getItem("token");
     if (!token) {
       setUser(null);
@@ -61,12 +61,11 @@ const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ children }) 
     } finally {
       setLoading(false);
     }
-  };
+  }, [apiUrl, router]);
 
   useEffect(() => {
     loadProfile();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [loadProfile]);
 
   const value = useMemo<ProfileContextValue>(
     () => ({
@@ -75,7 +74,7 @@ const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ children }) 
       loading,
       refetch: loadProfile,
     }),
-    [user, loading],
+    [user, loading, loadProfile],
   );
 
   return <ProfileContext.Provider value={value}>{children}</ProfileContext.Provider>;

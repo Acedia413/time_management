@@ -28,7 +28,9 @@ export default function TasksTeacherPage() {
   const currentRole = profileRole ?? "student";
   const router = useRouter();
   const searchParams = useSearchParams();
-  const isTeacherView = currentRole === "teacher" || currentRole === "admin";
+  const isTeacherProfile = currentRole === "teacher";
+  const isAdminProfile = currentRole === "admin";
+  const canAccessTeacherSection = isTeacherProfile || isAdminProfile;
   const [groups, setGroups] = useState<TeacherGroup[]>([]);
   const [groupsLoading, setGroupsLoading] = useState(true);
   const [groupsError, setGroupsError] = useState<string | null>(null);
@@ -66,7 +68,9 @@ export default function TasksTeacherPage() {
   };
   // Загрузка групп преподавателя
   useEffect(() => { 
-    if (!isTeacherView) {
+    if (!isTeacherProfile) {
+      setGroups([]);
+      resetSelection();
       setGroupsLoading(false);
       setGroupsError(null);
       return;
@@ -108,7 +112,7 @@ export default function TasksTeacherPage() {
       }
     };
     load();
-  }, [apiUrl, initialGroupParam, isTeacherView]);
+  }, [apiUrl, initialGroupParam, isTeacherProfile, resetSelection]);
   // Выбранная группа
   const selectedGroup = useMemo(
     () => groups.find((group) => group.group.id === selectedGroupId) ?? null,
@@ -122,8 +126,14 @@ export default function TasksTeacherPage() {
   const breadcrumbs = useMemo(() => {
     const items = [
       { label: "Задачи", action: () => router.push("/tasks") },
-      { label: "Задачи преподавателей", action: handleTeacherRoot },
+      {
+        label: "Задачи преподавателей",
+        action: isTeacherProfile ? handleTeacherRoot : undefined,
+      },
     ];
+    if (!isTeacherProfile) {
+      return items;
+    }
     if (selectedGroup) {
       items.push({
         label: selectedGroup.group.name,
@@ -137,7 +147,7 @@ export default function TasksTeacherPage() {
       items.push({ label: selectedStudentName });
     }
     return items;
-  }, [handleTeacherRoot, router, selectedGroup, selectedStudentName]);
+  }, [handleTeacherRoot, isTeacherProfile, router, selectedGroup, selectedStudentName]);
   // Загрузка задач студента
   useEffect(() => {
     if (!selectedStudentId) {
@@ -224,13 +234,22 @@ export default function TasksTeacherPage() {
               </span>
             ))}
           </div>
-          {!isTeacherView ? (
+          {!canAccessTeacherSection ? (
             <div className="card">
               <h4 style={{ marginTop: 0, marginBottom: 12 }}>Задачи преподавателей</h4>
               <TaskList
                 currentRole={currentRole}
                 currentUserId={user?.id}
                 mode="teacher"
+              />
+            </div>
+          ) : isAdminProfile ? (
+            <div className="card">
+              <h4 style={{ marginTop: 0, marginBottom: 12 }}>Задачи преподавателей</h4>
+              <TaskList
+                currentRole={currentRole}
+                currentUserId={user?.id}
+                creatorRoleFilter="teacher"
               />
             </div>
           ) : (

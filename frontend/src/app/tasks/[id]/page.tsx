@@ -130,7 +130,6 @@ export default function TaskDetailPage() {
   };
 
   const groupParam = searchParams.get("groupId");
-  const studentParam = searchParams.get("studentId");
 
   const breadcrumbs = useMemo(() => {
     const items: { label: string; href?: string }[] = [
