@@ -1,4 +1,4 @@
-﻿'use client';
+﻿"use client";
 
 import React, { useEffect, useState } from "react";
 
@@ -29,8 +29,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentRole, onNavigate }) => {
   const [tasksCount, setTasksCount] = useState<number | null>(null);
   const [isTasksCountLoading, setIsTasksCountLoading] = useState(false);
 
-  const apiUrl =
-    process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
   useEffect(() => {
     if (currentRole !== "admin") {
@@ -76,12 +75,12 @@ const Dashboard: React.FC<DashboardProps> = ({ currentRole, onNavigate }) => {
         const students = data.filter((user: SimpleUser) =>
           Array.isArray(user.roles)
             ? user.roles.some((role) => normalizeRole(role) === "STUDENT")
-            : false,
+            : false
         ).length;
         const teachers = data.filter((user: SimpleUser) =>
           Array.isArray(user.roles)
             ? user.roles.some((role) => normalizeRole(role) === "TEACHER")
-            : false,
+            : false
         ).length;
 
         setUserStats({
@@ -107,7 +106,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentRole, onNavigate }) => {
   }, [apiUrl, currentRole]);
 
   useEffect(() => {
-    if (currentRole !== "admin") {
+    if (currentRole !== "admin" && currentRole !== "teacher") {
       setTasksCount(null);
       setIsTasksCountLoading(false);
       return;
@@ -115,44 +114,51 @@ const Dashboard: React.FC<DashboardProps> = ({ currentRole, onNavigate }) => {
 
     const token = localStorage.getItem("token");
     if (!token) {
-      setTasksCount(null);
-      setIsTasksCountLoading(false);
       return;
     }
 
     let aborted = false;
-    setIsTasksCountLoading(true);
 
-    const loadTasks = async () => {
-      try {
-        const response = await fetch(`${apiUrl}/tasks`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+    // Если Админ — грузим задачи
+    if (currentRole === "admin") {
+      setIsTasksCountLoading(true);
+      const loadTasks = async () => {
+        try {
+          const response = await fetch(`${apiUrl}/tasks`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (response.ok && !aborted) {
+            const data = await response.json();
+            if (Array.isArray(data)) setTasksCount(data.length);
+          }
+        } finally {
+          if (!aborted) setIsTasksCountLoading(false);
+        }
+      };
+      loadTasks();
+    }
 
-        if (!response.ok) {
-          throw new Error("failed");
+    // Если Учитель — грузим активных студентов
+    if (currentRole === "teacher") {
+      const loadTeacherStats = async () => {
+        try {
+          const response = await fetch(`${apiUrl}/users/teacher-stats`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (response.ok && !aborted) {
+            const data = await response.json();
+            setUserStats((prev) => ({
+              ...prev,
+              students: data.activeStudents,
+            }));
+          }
+        } catch (e) {
+          console.error(e);
         }
+      };
+      loadTeacherStats();
+    }
 
-        const data = await response.json();
-        if (!Array.isArray(data)) {
-          throw new Error("invalid");
-        }
-
-        if (!aborted) {
-          setTasksCount(data.length);
-        }
-      } catch {
-        if (!aborted) {
-          setTasksCount(null);
-        }
-      } finally {
-        if (!aborted) {
-          setIsTasksCountLoading(false);
-        }
-      }
-    };
-
-    loadTasks();
     return () => {
       aborted = true;
     };
@@ -209,7 +215,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentRole, onNavigate }) => {
             </div>
             <div className="card stat-card">
               <h3>Активные студенты</h3>
-              <div className="value">12</div>
+              <div className="value">{userStats.students ?? "-"}</div>
             </div>
             <div className="card stat-card">
               <h3>Просрочено</h3>
@@ -297,5 +303,3 @@ const Dashboard: React.FC<DashboardProps> = ({ currentRole, onNavigate }) => {
 };
 
 export default Dashboard;
-
-

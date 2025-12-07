@@ -11,11 +11,11 @@
   Req,
   UseGuards,
 } from '@nestjs/common';
-import { UserResponse, UsersService } from './users.service';
+import { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { Request } from 'express';
+import { UserResponse, UsersService } from './users.service';
 
 type AuthenticatedRequest = Request & { user?: { roles?: string[] } };
 
@@ -23,6 +23,19 @@ type AuthenticatedRequest = Request & { user?: { roles?: string[] } };
 @Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
+
+  @Get('teacher-stats')
+  getTeacherStats(
+    @Req() req: AuthenticatedRequest,
+  ): Promise<{ activeStudents: number }> {
+    const user = req.user as any;
+    const id = Number(user?.sub);
+
+    if (!id || isNaN(id)) {
+      throw new ForbiddenException('Не удалось определить пользователя');
+    }
+    return this.usersService.getTeacherStats(id);
+  }
 
   @Get('count')
   count(): Promise<{ count: number }> {

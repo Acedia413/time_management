@@ -3,9 +3,9 @@
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { PrismaService } from '../prisma.service';
 import { Prisma, RoleName } from '@prisma/client';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
+import { PrismaService } from '../prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 
@@ -210,6 +210,36 @@ export class UsersService {
 
       throw err;
     }
+  }
+
+  // Получение статистики для преподавателя (количество активных студентов)
+  async getTeacherStats(
+    teacherId: number,
+  ): Promise<{ activeStudents: number }> {
+    // Находим все задачи преподавателя
+    const tasks = await this.prisma.task.findMany({
+      where: { createdById: teacherId, status: { not: 'CLOSED' } },
+      select: { groupId: true },
+    });
+
+    // Собираем уникальные ID групп
+    const groupIds = Array.from(
+      new Set(tasks.map((t) => t.groupId).filter((id): id is number => !!id)),
+    );
+
+    if (groupIds.length === 0) {
+      return { activeStudents: 0 };
+    }
+
+    // Считаем студентов в этих группах
+    const activeStudents = await this.prisma.user.count({
+      where: {
+        groupId: { in: groupIds },
+        roles: { some: { name: RoleName.STUDENT } },
+      },
+    });
+
+    return { activeStudents };
   }
 
   private buildConnectRelation(
