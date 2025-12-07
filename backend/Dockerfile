@@ -10,6 +10,7 @@ WORKDIR /app
 ARG PRISMA_DB_URL="postgresql://postgres:postgres@localhost:5432/postgres"
 ENV DATABASE_URL=$PRISMA_DB_URL
 COPY --from=deps /app/node_modules ./node_modules
+COPY package*.json ./
 COPY prisma ./prisma
 COPY nest-cli.json tsconfig*.json ./
 COPY src ./src
