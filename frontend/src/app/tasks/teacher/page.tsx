@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { Suspense, useEffect, useMemo, useState, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Header from "../../../components/Header";
 import Sidebar from "../../../components/Sidebar";
@@ -24,7 +24,7 @@ type TaskItem = {
   inReviewStudent?: { id: number; fullName: string } | null;
 };
 
-export default function TasksTeacherPage() {
+function TasksTeacherContent() {
   const { user, role: profileRole } = useProfile();
   const currentRole = profileRole ?? "student";
   const router = useRouter();
@@ -147,7 +147,7 @@ export default function TasksTeacherPage() {
       });
     }
     if (selectedStudentName) {
-      items.push({ label: selectedStudentName });
+      items.push({ label: selectedStudentName, action: undefined });
     }
     return items;
   }, [handleTeacherRoot, isTeacherProfile, router, selectedGroup, selectedStudentName]);
@@ -246,7 +246,7 @@ export default function TasksTeacherPage() {
                 currentRole={currentRole}
                 currentUserId={user?.id}
                 mode="teacher"
-                teacherStudentId={currentRole === "student" ? user?.id : undefined}
+                studentFilterId={currentRole === "student" ? user?.id : undefined}
                 creatorRoleFilter="teacher"
               />
             </div>
@@ -257,7 +257,6 @@ export default function TasksTeacherPage() {
                 currentRole={currentRole}
                 currentUserId={user?.id}
                 creatorRoleFilter="teacher"
-                studentFilterId={currentRole === "student" ? user?.id : undefined}
               />
             </div>
           ) : (
@@ -454,5 +453,13 @@ export default function TasksTeacherPage() {
         </div>
       </main>
     </div>
+  );
+}
+
+export default function TasksTeacherPage() {
+  return (
+    <Suspense fallback={<div id="contentArea">Загружаем страницу...</div>}>
+      <TasksTeacherContent />
+    </Suspense>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useMemo, useState } from "react";
+import { Suspense, useCallback, useMemo, useState } from "react";
 import Dashboard from "../components/Dashboard";
 import Header from "../components/Header";
 import Journal from "../components/Journal";
@@ -12,7 +12,7 @@ import Sidebar from "../components/Sidebar";
 import TaskList from "../components/TaskList";
 import UserList from "../components/UserList";
 
-export default function Home() {
+function HomeContent() {
   const { user, role: profileRole, loading: profileLoading } = useProfile();
   const [tasksMode, setTasksMode] = useState<"all" | "my" | "teacher">("all");
   const router = useRouter();
@@ -161,5 +161,13 @@ export default function Home() {
         <div id="contentArea">{renderContent()}</div>
       </main>
     </div>
+  );
+}
+
+export default function Home() {
+  return (
+    <Suspense fallback={<div id="contentArea">Загружаем страницу...</div>}>
+      <HomeContent />
+    </Suspense>
   );
 }

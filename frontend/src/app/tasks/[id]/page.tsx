@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import Header from "../../../components/Header";
 import { useProfile } from "../../../components/ProfileProvider";
 import Sidebar from "../../../components/Sidebar";
@@ -33,7 +33,7 @@ const statusLabels: Record<string, string> = {
   CLOSED: "Закрыта",
 };
 
-export default function TaskDetailPage() {
+function TaskDetailPageContent() {
   const params = useParams();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -517,5 +517,13 @@ export default function TaskDetailPage() {
         </div>
       </main>
     </div>
+  );
+}
+
+export default function TaskDetailPage() {
+  return (
+    <Suspense fallback={<div id="contentArea">Загружаем задачу...</div>}>
+      <TaskDetailPageContent />
+    </Suspense>
   );
 }
