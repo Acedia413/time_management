@@ -170,7 +170,7 @@ const TaskList: React.FC<TaskListProps> = ({
             : true
         );
       }
-      return filteredByRole.filter((task) => task.status !== "IN_REVIEW");
+      return filteredByRole;
     }
 
     return filteredByRole;
