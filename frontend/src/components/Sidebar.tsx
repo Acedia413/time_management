@@ -113,6 +113,17 @@ const Sidebar: React.FC<SidebarProps> = ({
       </nav>
       <div className="sidebar-footer">
         <div
+          style={{
+            marginBottom: 12,
+            fontSize: "0.85rem",
+            color: "var(--text-muted)",
+            lineHeight: 1.3,
+            textAlign: "center",
+          }}
+        >
+          Разработано: Петрова Ольга Константиновна, 2025 год
+        </div>
+        <div
           className="user-card"
           style={{ position: "relative", cursor: "pointer" }}
           onClick={() => setShowMenu((prev) => !prev)}
