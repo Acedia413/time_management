@@ -7,7 +7,7 @@ RUN npm ci
 
 FROM node:20-alpine AS builder
 WORKDIR /app
-ARG NEXT_PUBLIC_API_URL=https://api.stud-tracker.binarycascade.dev/
+ARG NEXT_PUBLIC_API_URL=https://api.stud-tracker.binarycascade.dev
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
@@ -17,7 +17,7 @@ RUN npm prune --omit=dev
 FROM node:20-alpine AS production
 WORKDIR /app
 ENV NODE_ENV=production
-ARG NEXT_PUBLIC_API_URL=https://api.stud-tracker.binarycascade.dev/
+ARG NEXT_PUBLIC_API_URL=https://api.stud-tracker.binarycascade.dev
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV PORT=3000
 COPY --from=builder /app/node_modules ./node_modules
