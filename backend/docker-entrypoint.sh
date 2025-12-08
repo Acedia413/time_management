@@ -9,4 +9,6 @@ if [ -z "$DATABASE_URL" ] && [ -n "$POSTGRES_USER" ] && [ -n "$POSTGRES_PASSWORD
   echo "DATABASE_URL is set via POSTGRES_* environment variables"
 fi
 
+npx prisma migrate deploy
+
 exec "$@"
