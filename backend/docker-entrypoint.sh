@@ -10,5 +10,8 @@ if [ -z "$DATABASE_URL" ] && [ -n "$POSTGRES_USER" ] && [ -n "$POSTGRES_PASSWORD
 fi
 
 npx prisma migrate deploy
+if [ "${RUN_DB_SEED:-true}" = "true" ]; then
+  node dist/prisma/seed.js
+fi
 
 exec "$@"
