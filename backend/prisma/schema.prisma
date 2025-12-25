@@ -30,21 +30,24 @@ enum TaskStatus {
 }
 
 model User {
-  id             Int            @id @default(autoincrement())
-  username       String         @unique
-  password       String
-  fullName       String
-  roles          Role[]
-  departmentId   Int?
-  department     Department?    @relation(fields: [departmentId], references: [id])
-  subjects       Subject[]
-  groupId        Int?
-  group          Group?         @relation(fields: [groupId], references: [id])
-  createdTasks   Task[]         @relation("TasksCreated")
-  tasksReviewing Task[]         @relation("TasksReviewing")
-  submissions    Submission[]
-  taskPriorities TaskPriority[]
-  activities     ActivityLog[]
+  id                 Int            @id @default(autoincrement())
+  username           String         @unique
+  password           String
+  fullName           String
+  roles              Role[]
+  departmentId       Int?
+  department         Department?    @relation(fields: [departmentId], references: [id])
+  subjects           Subject[]
+  groupId            Int?
+  group              Group?         @relation(fields: [groupId], references: [id])
+  createdTasks       Task[]         @relation("TasksCreated")
+  tasksReviewing     Task[]         @relation("TasksReviewing")
+  submissions        Submission[]
+  taskPriorities     TaskPriority[]
+  activities         ActivityLog[]
+  gradedSubmissions  Submission[]   @relation("GradedSubmissions")
+  taskComments       TaskComment[]
+  subTasks           SubTask[]
 }
 
 model ActivityLog {
@@ -111,19 +114,25 @@ model Task {
   inReviewStudent   User?          @relation("TasksReviewing", fields: [inReviewStudentId], references: [id])
   submissions       Submission[]
   priorities        TaskPriority[]
+  comments          TaskComment[]
+  subTasks          SubTask[]
 
   @@unique([title, groupId])
 }
 
 model Submission {
-  id          Int      @id @default(autoincrement())
+  id          Int       @id @default(autoincrement())
   content     String?
   fileUrl     String?
-  submittedAt DateTime @default(now())
+  submittedAt DateTime  @default(now())
+  grade       Int?
+  gradedAt    DateTime?
+  gradedById  Int?
   taskId      Int
   studentId   Int
-  task        Task     @relation(fields: [taskId], references: [id])
-  student     User     @relation(fields: [studentId], references: [id])
+  task        Task      @relation(fields: [taskId], references: [id])
+  student     User      @relation(fields: [studentId], references: [id])
+  gradedBy    User?     @relation("GradedSubmissions", fields: [gradedById], references: [id])
 
   @@unique([taskId, studentId])
 }
@@ -137,4 +146,28 @@ model TaskPriority {
   task     Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
   @@unique([userId, taskId])
+}
+
+model TaskComment {
+  id        Int      @id @default(autoincrement())
+  content   String
+  createdAt DateTime @default(now())
+  taskId    Int
+  authorId  Int
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  author    User     @relation(fields: [authorId], references: [id])
+}
+
+model SubTask {
+  id        Int      @id @default(autoincrement())
+  title     String
+  isDone    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  orderNum  Int      @default(0)
+  taskId    Int
+  studentId Int
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  student   User     @relation(fields: [studentId], references: [id])
+
+  @@unique([taskId, studentId, title])
 }
