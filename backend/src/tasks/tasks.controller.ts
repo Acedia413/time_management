@@ -20,6 +20,7 @@ import { extname } from 'path';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CreateSubmissionDto } from './dto/create-submission.dto';
 import { CreateTaskDto } from './dto/create-task.dto';
+import { GradeSubmissionDto } from './dto/grade-submission.dto';
 import { UpdateTaskPriorityDto } from './dto/update-task-priority.dto';
 import { UpdateTaskStatusDto } from './dto/update-task-status.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
@@ -270,6 +271,25 @@ export class TasksController {
     return this.tasksService.deleteSubmission(
       taskId,
       submissionId,
+      userId,
+      roles,
+    );
+  }
+
+  @Patch(':taskId/submissions/:submissionId/grade')
+  gradeSubmission(
+    @Param('submissionId', ParseIntPipe) submissionId: number,
+    @Body() dto: GradeSubmissionDto,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    const userId = req.user?.sub;
+    const roles = req.user?.roles ?? [];
+    if (!userId) {
+      throw new UnauthorizedException();
+    }
+    return this.tasksService.gradeSubmission(
+      submissionId,
+      dto.grade,
       userId,
       roles,
     );

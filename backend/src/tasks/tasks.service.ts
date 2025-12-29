@@ -39,6 +39,9 @@ export type SubmissionResponse = {
   content: string | null;
   fileUrl: string | null;
   submittedAt: Date;
+  grade: number | null;
+  gradedAt: Date | null;
+  gradedBy: { id: number; fullName: string } | null;
   student: { id: number; fullName: string };
 };
 // Ответ для списка групп по преподавателю
@@ -381,7 +384,10 @@ export class TasksService {
 
     const submissions = await this.prisma.submission.findMany({
       where: whereClause,
-      include: { student: { select: { id: true, fullName: true } } },
+      include: {
+        student: { select: { id: true, fullName: true } },
+        gradedBy: { select: { id: true, fullName: true } },
+      },
       orderBy: { submittedAt: 'desc' },
     });
 
@@ -390,6 +396,11 @@ export class TasksService {
       content: submission.content ?? null,
       fileUrl: submission.fileUrl ?? null,
       submittedAt: submission.submittedAt,
+      grade: submission.grade ?? null,
+      gradedAt: submission.gradedAt ?? null,
+      gradedBy: submission.gradedBy
+        ? { id: submission.gradedBy.id, fullName: submission.gradedBy.fullName }
+        : null,
       student: {
         id: submission.student.id,
         fullName: submission.student.fullName,
@@ -418,7 +429,10 @@ export class TasksService {
       where: { taskId_studentId: { taskId, studentId: userId } },
       update: data,
       create: data,
-      include: { student: { select: { id: true, fullName: true } } },
+      include: {
+        student: { select: { id: true, fullName: true } },
+        gradedBy: { select: { id: true, fullName: true } },
+      },
     });
 
     await this.prisma.activityLog.create({
@@ -434,6 +448,11 @@ export class TasksService {
       content: saved.content ?? null,
       fileUrl: saved.fileUrl ?? null,
       submittedAt: saved.submittedAt,
+      grade: saved.grade ?? null,
+      gradedAt: saved.gradedAt ?? null,
+      gradedBy: saved.gradedBy
+        ? { id: saved.gradedBy.id, fullName: saved.gradedBy.fullName }
+        : null,
       student: {
         id: saved.student.id,
         fullName: saved.student.fullName,
@@ -730,5 +749,58 @@ export class TasksService {
       select: { taskId: true, priority: true },
     });
     return saved;
+  }
+
+  async gradeSubmission(
+    submissionId: number,
+    grade: number,
+    graderId: number,
+    roles: string[],
+  ): Promise<SubmissionResponse> {
+    const normalizedRoles = roles.map((r) => r.toUpperCase()) as RoleName[];
+    const isTeacherOrAdmin = normalizedRoles.some(
+      (r) => r === RoleName.TEACHER || r === RoleName.ADMIN,
+    );
+
+    if (!isTeacherOrAdmin) {
+      throw new ForbiddenException('Недостаточно прав для выставления оценки.');
+    }
+
+    const submission = await this.prisma.submission.findUnique({
+      where: { id: submissionId },
+    });
+
+    if (!submission) {
+      throw new NotFoundException('Отправка не найдена.');
+    }
+
+    const updated = await this.prisma.submission.update({
+      where: { id: submissionId },
+      data: {
+        grade,
+        gradedAt: new Date(),
+        gradedById: graderId,
+      },
+      include: {
+        student: { select: { id: true, fullName: true } },
+        gradedBy: { select: { id: true, fullName: true } },
+      },
+    });
+
+    return {
+      id: updated.id,
+      content: updated.content ?? null,
+      fileUrl: updated.fileUrl ?? null,
+      submittedAt: updated.submittedAt,
+      grade: updated.grade ?? null,
+      gradedAt: updated.gradedAt ?? null,
+      gradedBy: updated.gradedBy
+        ? { id: updated.gradedBy.id, fullName: updated.gradedBy.fullName }
+        : null,
+      student: {
+        id: updated.student.id,
+        fullName: updated.student.fullName,
+      },
+    };
   }
 }
