@@ -23,6 +23,9 @@ type SubmissionItem = {
   content: string | null;
   fileUrl: string | null;
   submittedAt: string;
+  grade: number | null;
+  gradedAt: string | null;
+  gradedBy: { id: number; fullName: string } | null;
   student: { id: number; fullName: string };
 };
 
@@ -53,6 +56,8 @@ function TaskDetailPageContent() {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [gradingId, setGradingId] = useState<number | null>(null);
+  const [gradeValue, setGradeValue] = useState<string>("");
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
@@ -123,6 +128,50 @@ function TaskDetailPageContent() {
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Ошибка удаления отправки."
+      );
+    }
+  };
+  // Выставление оценки 
+  const handleGrade = async (submissionId: number) => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      setError("Требуется авторизация");
+      return;
+    }
+    const grade = parseInt(gradeValue, 10);
+    if (isNaN(grade) || grade < 0 || grade > 100) {
+      setError("Оценка должна быть от 0 до 100");
+      return;
+    }
+    try {
+      const response = await fetch(
+        `${apiUrl}/tasks/${params?.id}/submissions/${submissionId}/grade`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ grade }),
+        }
+      );
+      if (!response.ok) {
+        const details = await response.json().catch(() => null);
+        const message =
+          (Array.isArray(details?.message)
+            ? details.message[0]
+            : details?.message) ?? "Не удалось выставить оценку.";
+        throw new Error(message);
+      }
+      const updated = (await response.json()) as SubmissionItem;
+      setSubmissions((prev) =>
+        prev.map((s) => (s.id === updated.id ? updated : s))
+      );
+      setGradingId(null);
+      setGradeValue("");
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Ошибка выставления оценки."
       );
     }
   };
@@ -285,9 +334,35 @@ function TaskDetailPageContent() {
                         gap: 4,
                       }}
                     >
-                      <span style={{ fontWeight: 600 }}>
-                        {sub.student?.fullName ?? "Неизвестный студент"}
-                      </span>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ fontWeight: 600 }}>
+                          {sub.student?.fullName ?? "Неизвестный студент"}
+                        </span>
+                        {sub.grade !== null && (
+                          <span
+                            style={{
+                              padding: "2px 8px",
+                              borderRadius: 12,
+                              fontSize: "0.85rem",
+                              fontWeight: 600,
+                              background:
+                                sub.grade < 50
+                                  ? "#fef2f2"
+                                  : sub.grade < 75
+                                  ? "#fffbeb"
+                                  : "#ecfdf5",
+                              color:
+                                sub.grade < 50
+                                  ? "#dc2626"
+                                  : sub.grade < 75
+                                  ? "#d97706"
+                                  : "#059669",
+                            }}
+                          >
+                            {sub.grade}/100
+                          </span>
+                        )}
+                      </div>
                       <span
                         style={{
                           color: "var(--text-muted)",
@@ -328,6 +403,48 @@ function TaskDetailPageContent() {
                       <span style={{ color: "var(--text-muted)" }}>
                         Файл не приложен
                       </span>
+                    )}
+                    {(currentRole === "teacher" || currentRole === "admin") && (
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        {gradingId === sub.id ? (
+                          <>
+                            <input
+                              type="number"
+                              min="0"
+                              max="100"
+                              value={gradeValue}
+                              onChange={(e) => setGradeValue(e.target.value)}
+                              placeholder="0-100"
+                              style={{ width: 70 }}
+                            />
+                            <button
+                              className="btn btn-primary"
+                              onClick={() => handleGrade(sub.id)}
+                            >
+                              Сохранить
+                            </button>
+                            <button
+                              className="btn"
+                              onClick={() => {
+                                setGradingId(null);
+                                setGradeValue("");
+                              }}
+                            >
+                              Отмена
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            className="btn"
+                            onClick={() => {
+                              setGradingId(sub.id);
+                              setGradeValue(sub.grade !== null ? String(sub.grade) : "");
+                            }}
+                          >
+                            {sub.grade !== null ? "Изменить оценку" : "Оценить"}
+                          </button>
+                        )}
+                      </div>
                     )}
                     {((currentRole === "student" &&
                       user &&
