@@ -19,6 +19,7 @@ import { diskStorage } from 'multer';
 import { extname } from 'path';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CreateSubmissionDto } from './dto/create-submission.dto';
+import { CreateTaskCommentDto } from './dto/create-task-comment.dto';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { GradeSubmissionDto } from './dto/grade-submission.dto';
 import { UpdateTaskPriorityDto } from './dto/update-task-priority.dto';
@@ -293,5 +294,36 @@ export class TasksController {
       userId,
       roles,
     );
+  }
+
+  @Get(':id/comments')
+  getComments(@Param('id', ParseIntPipe) id: number) {
+    return this.tasksService.getCommentsForTask(id);
+  }
+
+  @Post(':id/comments')
+  createComment(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: CreateTaskCommentDto,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    const userId = req.user?.sub;
+    if (!userId) {
+      throw new UnauthorizedException();
+    }
+    return this.tasksService.createComment(id, dto.content, userId);
+  }
+
+  @Delete(':taskId/comments/:commentId')
+  deleteComment(
+    @Param('commentId', ParseIntPipe) commentId: number,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    const userId = req.user?.sub;
+    const roles = req.user?.roles ?? [];
+    if (!userId) {
+      throw new UnauthorizedException();
+    }
+    return this.tasksService.deleteComment(commentId, userId, roles);
   }
 }

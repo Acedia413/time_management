@@ -810,4 +810,86 @@ export class TasksService {
       },
     };
   }
+  // Получить все комментарии к задаче
+  async getCommentsForTask(taskId: number): Promise<CommentResponse[]> {
+    const comments = await this.prisma.taskComment.findMany({
+      where: { taskId },
+      include: {
+        author: { select: { id: true, fullName: true } },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    return comments.map((comment) => ({
+      id: comment.id,
+      content: comment.content,
+      createdAt: comment.createdAt,
+      author: {
+        id: comment.author.id,
+        fullName: comment.author.fullName,
+      },
+    }));
+  }
+
+
+  async createComment(
+    taskId: number,
+    content: string,
+    authorId: number,
+  ): Promise<CommentResponse> {
+    const task = await this.prisma.task.findUnique({
+      where: { id: taskId },
+    });
+
+    if (!task) {
+      throw new NotFoundException('Задача не найдена.');
+    }
+
+    const comment = await this.prisma.taskComment.create({
+      data: {
+        content,
+        taskId,
+        authorId,
+      },
+      include: {
+        author: { select: { id: true, fullName: true } },
+      },
+    });
+
+    return {
+      id: comment.id,
+      content: comment.content,
+      createdAt: comment.createdAt,
+      author: {
+        id: comment.author.id,
+        fullName: comment.author.fullName,
+      },
+    };
+  }
+
+  
+  async deleteComment(
+    commentId: number,
+    userId: number,
+    roles: string[],
+  ): Promise<{ success: true }> {
+    const comment = await this.prisma.taskComment.findUnique({
+      where: { id: commentId },
+    });
+
+    if (!comment) {
+      throw new NotFoundException('Комментарий не найден.');
+    }
+
+    const normalizedRoles = roles.map((r) => r.toUpperCase()) as RoleName[];
+    const isAdmin = normalizedRoles.includes(RoleName.ADMIN);
+    const isAuthor = comment.authorId === userId;
+
+    if (!isAdmin && !isAuthor) {
+      throw new ForbiddenException('Недостаточно прав для удаления комментария.');
+    }
+
+    await this.prisma.taskComment.delete({ where: { id: commentId } });
+    return { success: true as const };
+  }
 }
