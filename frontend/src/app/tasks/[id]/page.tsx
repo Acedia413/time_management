@@ -29,6 +29,13 @@ type SubmissionItem = {
   student: { id: number; fullName: string };
 };
 
+type CommentItem = {
+  id: number;
+  content: string;
+  createdAt: string;
+  author: { id: number; fullName: string };
+};
+
 const statusLabels: Record<string, string> = {
   DRAFT: "Черновик",
   ACTIVE: "В работе",
@@ -58,6 +65,8 @@ function TaskDetailPageContent() {
   const [formError, setFormError] = useState<string | null>(null);
   const [gradingId, setGradingId] = useState<number | null>(null);
   const [gradeValue, setGradeValue] = useState<string>("");
+  const [comments, setComments] = useState<CommentItem[]>([]);
+  const [newComment, setNewComment] = useState<string>("");
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
@@ -93,6 +102,15 @@ function TaskDetailPageContent() {
         if (submissionsResponse.ok) {
           const subs = (await submissionsResponse.json()) as SubmissionItem[];
           setSubmissions(subs);
+        }
+
+        const commentsResponse = await fetch(
+          `${apiUrl}/tasks/${params?.id}/comments`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (commentsResponse.ok) {
+          const comms = (await commentsResponse.json()) as CommentItem[];
+          setComments(comms);
         }
       } catch (e) {
         setError(e instanceof Error ? e.message : "Ошибка загрузки задачи.");
@@ -172,6 +190,65 @@ function TaskDetailPageContent() {
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Ошибка выставления оценки."
+      );
+    }
+  };
+
+  const handleAddComment = async () => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      setError("Требуется авторизация");
+      return;
+    }
+    if (!newComment.trim()) {
+      return;
+    }
+    try {
+      const response = await fetch(
+        `${apiUrl}/tasks/${params?.id}/comments`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ content: newComment.trim() }),
+        }
+      );
+      if (!response.ok) {
+        throw new Error("Не удалось добавить комментарий.");
+      }
+      const created = (await response.json()) as CommentItem;
+      setComments((prev) => [...prev, created]);
+      setNewComment("");
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Ошибка добавления комментария."
+      );
+    }
+  };
+
+  const handleDeleteComment = async (commentId: number) => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      setError("Требуется авторизация");
+      return;
+    }
+    try {
+      const response = await fetch(
+        `${apiUrl}/tasks/${params?.id}/comments/${commentId}`,
+        {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      if (!response.ok) {
+        throw new Error("Не удалось удалить комментарий.");
+      }
+      setComments((prev) => prev.filter((c) => c.id !== commentId));
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Ошибка удаления комментария."
       );
     }
   };
@@ -631,6 +708,60 @@ function TaskDetailPageContent() {
               </form>
             </div>
           )}
+          <div className="card" style={{ marginTop: 12 }}>
+            <h4 style={{ marginTop: 0, marginBottom: 12 }}>Комментарии</h4>
+            {comments.length > 0 ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
+                {comments.map((comment) => (
+                  <div
+                    key={comment.id}
+                    style={{
+                      padding: "10px 12px",
+                      border: "1px solid var(--border)",
+                      borderRadius: 8,
+                    }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                      <div>
+                        <span style={{ fontWeight: 600 }}>{comment.author.fullName}</span>
+                        <span style={{ color: "var(--text-muted)", fontSize: "0.85rem", marginLeft: 8 }}>
+                          {new Date(comment.createdAt).toLocaleString("ru-RU")}
+                        </span>
+                      </div>
+                      {(user?.id === comment.author.id || currentRole === "admin") && (
+                        <button
+                          className="btn"
+                          style={{ color: "var(--danger)", padding: "2px 8px", fontSize: "0.85rem" }}
+                          onClick={() => handleDeleteComment(comment.id)}
+                        >
+                          Удалить
+                        </button>
+                      )}
+                    </div>
+                    <p style={{ margin: "8px 0 0 0" }}>{comment.content}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p style={{ color: "var(--text-muted)", marginBottom: 12 }}>Комментариев пока нет</p>
+            )}
+            <div style={{ display: "flex", gap: 8 }}>
+              <input
+                type="text"
+                value={newComment}
+                onChange={(e) => setNewComment(e.target.value)}
+                placeholder="Написать комментарий..."
+                style={{ flex: 1 }}
+              />
+              <button
+                className="btn btn-primary"
+                onClick={handleAddComment}
+                disabled={!newComment.trim()}
+              >
+                Отправить
+              </button>
+            </div>
+          </div>
         </div>
       </main>
     </div>
