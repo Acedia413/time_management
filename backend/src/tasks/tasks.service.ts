@@ -50,6 +50,13 @@ export type TeacherGroupStudentsResponse = {
   students: { id: number; fullName: string }[];
 };
 
+export type CommentResponse = {
+  id: number;
+  content: string;
+  createdAt: Date;
+  author: { id: number; fullName: string };
+};
+
 type SimpleGroupResponse = { id: number; name: string };
 
 type TaskWithRelations = {
