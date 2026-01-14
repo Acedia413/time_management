@@ -59,6 +59,14 @@ export type CommentResponse = {
 
 type SimpleGroupResponse = { id: number; name: string };
 
+export type CalendarTaskResponse = {
+  id: number;
+  title: string;
+  dueDate: Date;
+  status: TaskStatus;
+  group: { id: number; name: string } | null;
+};
+
 type TaskWithRelations = {
   id: number;
   title: string;
@@ -891,5 +899,72 @@ export class TasksService {
 
     await this.prisma.taskComment.delete({ where: { id: commentId } });
     return { success: true as const };
+  }
+
+  async getTasksForCalendar(
+    userId: number,
+    roles: string[],
+    month: string,
+  ): Promise<CalendarTaskResponse[]> {
+    const [yearStr, monthStr] = month.split('-');
+    const year = parseInt(yearStr, 10);
+    const monthNum = parseInt(monthStr, 10);
+
+    if (isNaN(year) || isNaN(monthNum) || monthNum < 1 || monthNum > 12) {
+      throw new BadRequestException('Некорректный формат месяца. Используйте YYYY-MM.');
+    }
+
+    const startDate = new Date(year, monthNum - 1, 1);
+    const endDate = new Date(year, monthNum, 0, 23, 59, 59, 999);
+
+    const normalizedRoles = roles.map((r) => r.toUpperCase()) as RoleName[];
+    const isStudentOnly =
+      normalizedRoles.includes(RoleName.STUDENT) &&
+      !normalizedRoles.includes(RoleName.TEACHER) &&
+      !normalizedRoles.includes(RoleName.ADMIN);
+
+    let groupId: number | null = null;
+    if (isStudentOnly) {
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { groupId: true },
+      });
+      groupId = user?.groupId ?? null;
+    }
+
+    const tasks = await this.prisma.task.findMany({
+      where: {
+        dueDate: {
+          gte: startDate,
+          lte: endDate,
+        },
+        ...(isStudentOnly
+          ? {
+              OR: [
+                { groupId: null },
+                groupId !== null ? { groupId } : undefined,
+              ].filter(Boolean) as Record<string, unknown>[],
+            }
+          : {}),
+      },
+      select: {
+        id: true,
+        title: true,
+        dueDate: true,
+        status: true,
+        group: { select: { id: true, name: true } },
+      },
+      orderBy: { dueDate: 'asc' },
+    });
+
+    return tasks
+      .filter((task): task is typeof task & { dueDate: Date } => task.dueDate !== null)
+      .map((task) => ({
+        id: task.id,
+        title: task.title,
+        dueDate: task.dueDate,
+        status: task.status,
+        group: task.group ? { id: task.group.id, name: task.group.name } : null,
+      }));
   }
 }

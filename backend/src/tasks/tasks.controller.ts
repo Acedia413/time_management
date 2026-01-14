@@ -26,6 +26,7 @@ import { UpdateTaskPriorityDto } from './dto/update-task-priority.dto';
 import { UpdateTaskStatusDto } from './dto/update-task-status.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import {
+  CalendarTaskResponse,
   TaskResponse,
   TasksService,
   TeacherGroupStudentsResponse,
@@ -89,6 +90,24 @@ export class TasksController {
       throw new UnauthorizedException();
     }
     return this.tasksService.updateTaskPriority(userId, id, dto.priority);
+  }
+
+  @Get('calendar')
+  getTasksForCalendar(
+    @Req() req: AuthenticatedRequest,
+  ): Promise<CalendarTaskResponse[]> {
+    const userId = req.user?.sub;
+    const roles = req.user?.roles ?? [];
+    if (!userId) {
+      throw new UnauthorizedException();
+    }
+    const month = (req.query as { month?: string }).month;
+    if (!month) {
+      const now = new Date();
+      const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+      return this.tasksService.getTasksForCalendar(userId, roles, currentMonth);
+    }
+    return this.tasksService.getTasksForCalendar(userId, roles, month);
   }
 
   @Get()
