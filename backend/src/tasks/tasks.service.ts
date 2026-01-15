@@ -79,6 +79,25 @@ export type TaskStudentsStatusResponse = {
   notSubmitted: StudentSubmissionStatus[];
 };
 
+export type StudentDashboardResponse = {
+  totalTasks: number;
+  submittedCount: number;
+  notSubmittedCount: number;
+  overdueCount: number;
+  nearestDeadline: {
+    taskId: number;
+    title: string;
+    dueDate: Date;
+    daysLeft: number;
+  } | null;
+  recentGrades: {
+    taskId: number;
+    title: string;
+    grade: number;
+    gradedAt: Date;
+  }[];
+};
+
 type TaskWithRelations = {
   id: number;
   title: string;
@@ -1050,5 +1069,98 @@ export class TasksService {
     }
 
     return { submitted, notSubmitted };
+  }
+
+  async getStudentDashboard(userId: number): Promise<StudentDashboardResponse> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { groupId: true },
+    });
+
+    const groupId = user?.groupId ?? null;
+
+    const tasks = await this.prisma.task.findMany({
+      where: {
+        status: { in: [TaskStatus.ACTIVE, TaskStatus.IN_REVIEW] },
+        OR: [
+          { groupId: null },
+          groupId !== null ? { groupId } : undefined,
+        ].filter(Boolean) as Record<string, unknown>[],
+      },
+      select: {
+        id: true,
+        title: true,
+        dueDate: true,
+      },
+    });
+
+    const taskIds = tasks.map((t) => t.id);
+
+    const submissions = await this.prisma.submission.findMany({
+      where: {
+        studentId: userId,
+        taskId: { in: taskIds },
+      },
+      select: {
+        taskId: true,
+        grade: true,
+        gradedAt: true,
+        task: { select: { title: true } },
+      },
+    });
+
+    const submittedTaskIds = new Set(submissions.map((s) => s.taskId));
+
+    const totalTasks = tasks.length;
+    const submittedCount = submittedTaskIds.size;
+    const notSubmittedCount = totalTasks - submittedCount;
+
+    const now = new Date();
+    let overdueCount = 0;
+    let nearestDeadline: StudentDashboardResponse['nearestDeadline'] = null;
+
+    for (const task of tasks) {
+      if (!submittedTaskIds.has(task.id) && task.dueDate) {
+        if (task.dueDate < now) {
+          overdueCount++;
+        } else {
+          const daysLeft = Math.ceil(
+            (task.dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
+          );
+          if (!nearestDeadline || task.dueDate < nearestDeadline.dueDate) {
+            nearestDeadline = {
+              taskId: task.id,
+              title: task.title,
+              dueDate: task.dueDate,
+              daysLeft,
+            };
+          }
+        }
+      }
+    }
+
+    const recentGrades = submissions
+      .filter((s) => s.grade !== null && s.gradedAt !== null)
+      .sort((a, b) => {
+        const dateA = a.gradedAt?.getTime() ?? 0;
+        const dateB = b.gradedAt?.getTime() ?? 0;
+        return dateB - dateA;
+      })
+      .slice(0, 5)
+      .map((s) => ({
+        taskId: s.taskId,
+        title: s.task.title,
+        grade: s.grade as number,
+        gradedAt: s.gradedAt as Date,
+      }));
+
+    return {
+      totalTasks,
+      submittedCount,
+      notSubmittedCount,
+      overdueCount,
+      nearestDeadline,
+      recentGrades,
+    };
   }
 }

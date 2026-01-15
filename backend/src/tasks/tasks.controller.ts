@@ -27,6 +27,7 @@ import { UpdateTaskStatusDto } from './dto/update-task-status.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import {
   CalendarTaskResponse,
+  StudentDashboardResponse,
   TaskResponse,
   TasksService,
   TaskStudentsStatusResponse,
@@ -91,6 +92,17 @@ export class TasksController {
       throw new UnauthorizedException();
     }
     return this.tasksService.updateTaskPriority(userId, id, dto.priority);
+  }
+
+  @Get('student-dashboard')
+  getStudentDashboard(
+    @Req() req: AuthenticatedRequest,
+  ): Promise<StudentDashboardResponse> {
+    const userId = req.user?.sub;
+    if (!userId) {
+      throw new UnauthorizedException();
+    }
+    return this.tasksService.getStudentDashboard(userId);
   }
 
   @Get('calendar')
