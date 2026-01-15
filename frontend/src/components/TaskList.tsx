@@ -42,6 +42,18 @@ type GroupOption = {
   id: number;
   name: string;
 };
+
+type StudentStatus = {
+  id: number;
+  fullName: string;
+  submittedAt?: string;
+  grade?: number | null;
+};
+
+type StudentsStatusData = {
+  submitted: StudentStatus[];
+  notSubmitted: StudentStatus[];
+};
 // Подписи и стили для статусов задач
 const statusLabels: Record<string, string> = {
   DRAFT: "Черновик",
@@ -85,6 +97,14 @@ const TaskList: React.FC<TaskListProps> = ({
   const [groups, setGroups] = useState<GroupOption[]>([]);
   const [groupsLoading, setGroupsLoading] = useState(false);
   const [groupsError, setGroupsError] = useState<string | null>(null);
+
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [groupFilter, setGroupFilter] = useState<string>("all");
+  const [subjectFilter, setSubjectFilter] = useState<string>("all");
+
+  const [selectedTask, setSelectedTask] = useState<TaskItem | null>(null);
+  const [studentsStatus, setStudentsStatus] = useState<StudentsStatusData | null>(null);
+  const [studentsStatusLoading, setStudentsStatusLoading] = useState(false);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
   const isAdminTask = (task: TaskItem) =>
@@ -130,25 +150,35 @@ const TaskList: React.FC<TaskListProps> = ({
 
   const viewTasks = useMemo(() => {
     let scoped = tasks;
-    if (mode === "my" && currentUserId) {
-      if (currentRole === "teacher") {
-        scoped = tasks.filter(
-          (task) =>
-            task.createdBy?.id === currentUserId || task.status === "IN_REVIEW"
-        );
-      } else {
-        scoped = tasks.filter((task) => task.createdBy?.id === currentUserId);
+
+    const isTeacherOrAdmin =
+      currentRole === "teacher" || currentRole === "admin";
+
+    if (isTeacherOrAdmin) {
+      if (statusFilter !== "all") {
+        scoped = scoped.filter((task) => task.status === statusFilter);
       }
-    } else if (currentRole === "teacher" && currentUserId) {
-      scoped = tasks.filter(
-        (task) => task.createdBy?.id === currentUserId || isAdminTask(task)
-      );
-    } else if (
-      mode === "teacher" &&
-      currentRole === "student" &&
-      currentUserId
-    ) {
-      scoped = tasks.filter((task) => task.createdBy?.id !== currentUserId);
+      if (groupFilter !== "all") {
+        const gid = Number(groupFilter);
+        scoped = scoped.filter((task) => task.group?.id === gid);
+      }
+      if (subjectFilter !== "all") {
+        const sid = Number(subjectFilter);
+        scoped = scoped.filter((task) => task.subject?.id === sid);
+      }
+      scoped = [...scoped].sort((a, b) => {
+        if (!a.dueDate && !b.dueDate) return 0;
+        if (!a.dueDate) return 1;
+        if (!b.dueDate) return -1;
+        return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+      });
+      return scoped;
+    }
+
+    if (mode === "my" && currentUserId) {
+      scoped = scoped.filter((task) => task.createdBy?.id === currentUserId);
+    } else if (mode === "teacher" && currentUserId) {
+      scoped = scoped.filter((task) => task.createdBy?.id !== currentUserId);
     }
 
     if (!creatorRoleFilter) {
@@ -181,6 +211,9 @@ const TaskList: React.FC<TaskListProps> = ({
     currentRole,
     creatorRoleFilter,
     studentFilterId,
+    statusFilter,
+    groupFilter,
+    subjectFilter,
   ]);
   // Подготавливаю статистику для отображения
   const stats = useMemo(() => {
@@ -385,6 +418,39 @@ const TaskList: React.FC<TaskListProps> = ({
       setActionLoading(null);
     }
   };
+
+  const handleTaskSelect = async (task: TaskItem) => {
+    setSelectedTask(task);
+    setStudentsStatus(null);
+    setStudentsStatusLoading(true);
+
+    const token = localStorage.getItem("token");
+    if (!token) {
+      setStudentsStatusLoading(false);
+      return;
+    }
+
+    try {
+      const response = await fetch(`${apiUrl}/tasks/${task.id}/students-status`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setStudentsStatus(data);
+      }
+    } catch {
+      setStudentsStatus(null);
+    } finally {
+      setStudentsStatusLoading(false);
+    }
+  };
+
+  const handleBackToList = () => {
+    setSelectedTask(null);
+    setStudentsStatus(null);
+  };
+
   // Отображаю статистику и список задач
   return (
     <div>
@@ -432,6 +498,64 @@ const TaskList: React.FC<TaskListProps> = ({
           Закрыты: {stats.closed}
         </span>
       </div>
+      {(currentRole === "teacher" || currentRole === "admin") && (
+        <div
+          style={{
+            display: "flex",
+            gap: 12,
+            marginBottom: 16,
+            flexWrap: "wrap",
+            alignItems: "center",
+          }}
+        >
+          <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ fontSize: "0.9rem" }}>Статус:</span>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              style={{ padding: "6px 10px", borderRadius: 6 }}
+            >
+              <option value="all">Все</option>
+              <option value="DRAFT">Черновик</option>
+              <option value="ACTIVE">В работе</option>
+              <option value="IN_REVIEW">На проверке</option>
+              <option value="CLOSED">Закрыта</option>
+            </select>
+          </label>
+          <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ fontSize: "0.9rem" }}>Группа:</span>
+            <select
+              value={groupFilter}
+              onChange={(e) => setGroupFilter(e.target.value)}
+              style={{ padding: "6px 10px", borderRadius: 6 }}
+              disabled={groupsLoading}
+            >
+              <option value="all">Все</option>
+              {groups.map((g) => (
+                <option key={g.id} value={String(g.id)}>
+                  {g.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ fontSize: "0.9rem" }}>Предмет:</span>
+            <select
+              value={subjectFilter}
+              onChange={(e) => setSubjectFilter(e.target.value)}
+              style={{ padding: "6px 10px", borderRadius: 6 }}
+              disabled={subjectsLoading}
+            >
+              <option value="all">Все</option>
+              {subjects.map((s) => (
+                <option key={s.id} value={String(s.id)}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      )}
       {(currentRole === "teacher" || currentRole === "admin") && (
         <form
           className="card"
@@ -691,90 +815,261 @@ const TaskList: React.FC<TaskListProps> = ({
         </form>
       )}
 
-      {rows.length === 0 ? (
-        <p style={{ color: "var(--text-muted)" }}>Задачи пока не найдены.</p>
-      ) : (
-        rows.map((task) => (
-          <div className="task-card" key={task.id}>
-            <div className="task-info">
-              <div style={{ marginBottom: "5px", display: "flex", gap: 8 }}>
-                <span className={`badge ${task.badgeClass}`}>{task.label}</span>
-                {task.group && (
-                  <span
-                    className="badge"
-                    style={{ background: "#f3f4f6", color: "#666" }}
-                  >
-                    {task.group.name}
-                  </span>
-                )}
-                {task.subject && (
-                  <span
-                    className="badge"
-                    style={{ background: "#e0f2fe", color: "#0369a1" }}
-                  >
-                    {task.subject.name}
-                  </span>
-                )}
-              </div>
-              <h4>{task.title}</h4>
-              <p style={{ color: "var(--text-muted)" }}>{task.description}</p>
-              <div className="task-meta">
-                <span>Срок: {task.due}</span>
-                <span>Автор: {task.createdBy?.fullName ?? "Неизвестно"}</span>
-                {task.subject && <span>Предмет: {task.subject.name}</span>}
-                {task.status === "IN_REVIEW" && (
-                  <span>
-                    На проверке: {task.reviewStudentName ?? "студент не указан"}
-                  </span>
-                )}
-              </div>
-            </div>
-            <div className="task-actions">
-              {currentRole === "student" ? (
-                <Link
-                  href={`/tasks/${task.id}?from=${mode ?? "all"}`}
-                  className="btn"
-                  style={{ border: "1px solid var(--border)" }}
+      {selectedTask && (currentRole === "teacher" || currentRole === "admin") ? (
+        <div>
+          <div
+            style={{
+              marginBottom: 16,
+              fontSize: "0.95rem",
+              color: "var(--text-muted)",
+            }}
+          >
+            <span
+              style={{ cursor: "pointer", color: "var(--primary)" }}
+              onClick={handleBackToList}
+            >
+              Задачи
+            </span>
+            <span style={{ margin: "0 8px" }}>→</span>
+            <span>{selectedTask.title}</span>
+          </div>
+
+          <div className="card" style={{ marginBottom: 16 }}>
+            <div style={{ marginBottom: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {selectedTask.group && (
+                <span
+                  className="badge"
+                  style={{ background: "#f3f4f6", color: "#666" }}
                 >
-                  Открыть
-                </Link>
-              ) : (
-                <div style={{ display: "flex", gap: 8 }}>
-                  {task.status !== "CLOSED" && (
-                    <button
-                      className="btn"
-                      style={{ color: "var(--primary)" }}
-                      disabled={actionLoading === task.id}
-                      onClick={() => handleStatusChange(task.id, "CLOSED")}
-                    >
-                      {actionLoading === task.id ? "Закрываем..." : "Закрыть"}
-                    </button>
-                  )}
-                  {task.status !== "IN_REVIEW" && task.status !== "CLOSED" && (
-                    <button
-                      className="btn"
-                      style={{ color: "var(--primary)" }}
-                      disabled={actionLoading === task.id}
-                      onClick={() => handleStatusChange(task.id, "IN_REVIEW")}
-                    >
-                      {actionLoading === task.id
-                        ? "Обновляем..."
-                        : "На проверке"}
-                    </button>
-                  )}
-                  <button
-                    className="btn"
-                    style={{ color: "var(--danger)" }}
-                    disabled={actionLoading === task.id}
-                    onClick={() => handleDelete(task.id)}
-                  >
-                    {actionLoading === task.id ? "Удаляем..." : "Удалить"}
-                  </button>
-                </div>
+                  {selectedTask.group.name}
+                </span>
+              )}
+              {selectedTask.subject && (
+                <span
+                  className="badge"
+                  style={{ background: "#e0f2fe", color: "#0369a1" }}
+                >
+                  {selectedTask.subject.name}
+                </span>
               )}
             </div>
+            <h3 style={{ margin: "0 0 8px 0" }}>{selectedTask.title}</h3>
+            <p style={{ color: "var(--text-muted)", margin: "0 0 12px 0" }}>
+              {selectedTask.description}
+            </p>
+            <div style={{ fontSize: "0.9rem", color: "var(--text-muted)" }}>
+              <span>
+                Срок:{" "}
+                {selectedTask.dueDate
+                  ? new Date(selectedTask.dueDate).toLocaleDateString("ru-RU")
+                  : "Без срока"}
+              </span>
+              <span style={{ marginLeft: 16 }}>
+                Автор: {selectedTask.createdBy?.fullName ?? "Неизвестно"}
+              </span>
+            </div>
           </div>
-        ))
+
+          <div className="card">
+            <h4 style={{ margin: "0 0 16px 0" }}>Студенты</h4>
+            {studentsStatusLoading ? (
+              <p style={{ margin: 0, color: "var(--text-muted)" }}>Загружаем...</p>
+            ) : studentsStatus ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                {studentsStatus.submitted.length > 0 && (
+                  <div>
+                    <h5 style={{ margin: "0 0 8px 0", color: "var(--success)" }}>
+                      Сдали ({studentsStatus.submitted.length})
+                    </h5>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      {studentsStatus.submitted.map((student) => (
+                        <Link
+                          key={student.id}
+                          href={`/tasks/${selectedTask.id}?studentId=${student.id}`}
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            padding: "10px 14px",
+                            background: "#f0fdf4",
+                            borderRadius: 8,
+                            textDecoration: "none",
+                            color: "inherit",
+                            border: "1px solid #bbf7d0",
+                          }}
+                        >
+                          <span style={{ fontWeight: 500 }}>{student.fullName}</span>
+                          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                            <span
+                              className="badge"
+                              style={{ background: "#dcfce7", color: "#166534" }}
+                            >
+                              Сдано
+                            </span>
+                            {student.submittedAt && (
+                              <span style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
+                                {new Date(student.submittedAt).toLocaleDateString("ru-RU")}
+                              </span>
+                            )}
+                            {student.grade !== null && student.grade !== undefined && (
+                              <span
+                                style={{
+                                  fontWeight: 600,
+                                  padding: "2px 8px",
+                                  borderRadius: 4,
+                                  background:
+                                    student.grade >= 75
+                                      ? "#dcfce7"
+                                      : student.grade >= 50
+                                      ? "#fef9c3"
+                                      : "#fee2e2",
+                                  color:
+                                    student.grade >= 75
+                                      ? "#166534"
+                                      : student.grade >= 50
+                                      ? "#854d0e"
+                                      : "#dc2626",
+                                }}
+                              >
+                                {student.grade}
+                              </span>
+                            )}
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {studentsStatus.notSubmitted.length > 0 && (
+                  <div>
+                    <h5 style={{ margin: "0 0 8px 0", color: "var(--danger)" }}>
+                      Не сдали ({studentsStatus.notSubmitted.length})
+                    </h5>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      {studentsStatus.notSubmitted.map((student) => (
+                        <div
+                          key={student.id}
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            padding: "10px 14px",
+                            background: "#fef2f2",
+                            borderRadius: 8,
+                            border: "1px solid #fecaca",
+                          }}
+                        >
+                          <span style={{ fontWeight: 500 }}>{student.fullName}</span>
+                          <span
+                            className="badge"
+                            style={{ background: "#fee2e2", color: "#dc2626" }}
+                          >
+                            Не сдано
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {studentsStatus.submitted.length === 0 &&
+                  studentsStatus.notSubmitted.length === 0 && (
+                    <p style={{ margin: 0, color: "var(--text-muted)" }}>
+                      Нет студентов в группе
+                    </p>
+                  )}
+              </div>
+            ) : (
+              <p style={{ margin: 0, color: "var(--text-muted)" }}>
+                {selectedTask.group
+                  ? "Не удалось загрузить данные"
+                  : "Задача не привязана к группе"}
+              </p>
+            )}
+          </div>
+        </div>
+      ) : rows.length === 0 ? (
+        <p style={{ color: "var(--text-muted)" }}>Задачи пока не найдены.</p>
+      ) : (
+        rows.map((task) => {
+          const isTeacherOrAdmin =
+            currentRole === "teacher" || currentRole === "admin";
+
+          return (
+            <div
+              className="task-card"
+              key={task.id}
+              style={{ cursor: isTeacherOrAdmin ? "pointer" : "default" }}
+              onClick={() => {
+                if (isTeacherOrAdmin) {
+                  const originalTask = tasks.find((t) => t.id === task.id);
+                  if (originalTask) {
+                    handleTaskSelect(originalTask);
+                  }
+                }
+              }}
+            >
+              <div className="task-info">
+                <div style={{ marginBottom: "5px", display: "flex", gap: 8 }}>
+                  {currentRole === "student" && (
+                    <span className={`badge ${task.badgeClass}`}>{task.label}</span>
+                  )}
+                  {task.group && (
+                    <span
+                      className="badge"
+                      style={{ background: "#f3f4f6", color: "#666" }}
+                    >
+                      {task.group.name}
+                    </span>
+                  )}
+                  {task.subject && (
+                    <span
+                      className="badge"
+                      style={{ background: "#e0f2fe", color: "#0369a1" }}
+                    >
+                      {task.subject.name}
+                    </span>
+                  )}
+                </div>
+                <h4>{task.title}</h4>
+                <p style={{ color: "var(--text-muted)" }}>{task.description}</p>
+                <div className="task-meta">
+                  <span>Срок: {task.due}</span>
+                  <span>Автор: {task.createdBy?.fullName ?? "Неизвестно"}</span>
+                </div>
+              </div>
+
+              <div className="task-actions" onClick={(e) => e.stopPropagation()}>
+                {currentRole === "student" ? (
+                  <Link
+                    href={`/tasks/${task.id}?from=${mode ?? "all"}`}
+                    className="btn"
+                    style={{ border: "1px solid var(--border)" }}
+                  >
+                    Открыть
+                  </Link>
+                ) : (
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <Link
+                      href={`/tasks/${task.id}`}
+                      className="btn"
+                      style={{ border: "1px solid var(--border)" }}
+                    >
+                      Открыть
+                    </Link>
+                    <button
+                      className="btn"
+                      style={{ color: "var(--danger)" }}
+                      disabled={actionLoading === task.id}
+                      onClick={() => handleDelete(task.id)}
+                    >
+                      {actionLoading === task.id ? "Удаляем..." : "Удалить"}
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })
       )}
     </div>
   );

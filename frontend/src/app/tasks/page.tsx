@@ -30,19 +30,19 @@ export default function TasksAllPage() {
       <main className="main-content">
         <Header currentView="tasks" currentRole={currentRole} user={user} />
         <div id="contentArea">
-          <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-            <button className="btn btn-primary" disabled>
-              Все задачи
-            </button>
-            {currentRole !== "student" && (
+          {currentRole === "student" && (
+            <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+              <button className="btn btn-primary" disabled>
+                Все задачи
+              </button>
               <button className="btn" onClick={() => router.push("/tasks/my")}>
                 Мои задачи
               </button>
-            )}
-            <button className="btn" onClick={() => router.push("/tasks/teacher")}>
-              Задачи преподавателей
-            </button>
-          </div>
+              <button className="btn" onClick={() => router.push("/tasks/teacher")}>
+                Задачи преподавателей
+              </button>
+            </div>
+          )}
           <TaskList
             currentRole={currentRole}
             currentUserId={user?.id}

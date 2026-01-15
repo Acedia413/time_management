@@ -213,19 +213,19 @@ function TasksTeacherContent() {
       <main className="main-content">
         <Header currentView="tasks" currentRole={currentRole} user={user} />
         <div id="contentArea">
-          <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
-            <button className="btn" onClick={() => router.push("/tasks")}>
-              Все задачи
-            </button>
-            {currentRole !== "student" && (
+          {currentRole === "student" && (
+            <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+              <button className="btn" onClick={() => router.push("/tasks")}>
+                Все задачи
+              </button>
               <button className="btn" onClick={() => router.push("/tasks/my")}>
                 Мои задачи
               </button>
-            )}
-            <button className="btn btn-primary" disabled>
-              Задачи преподавателей
-            </button>
-          </div>
+              <button className="btn btn-primary" disabled>
+                Задачи преподавателей
+              </button>
+            </div>
+          )}
           <div style={{ marginBottom: 16, fontSize: "0.95rem", color: "var(--text-muted)" }}>
             {breadcrumbs.map((item, index) => (
               <span key={`${item.label}-${index}`}>
