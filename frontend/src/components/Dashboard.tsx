@@ -17,6 +17,25 @@ type SimpleUser = {
   roles?: string[];
 };
 
+type StudentDashboard = {
+  totalTasks: number;
+  submittedCount: number;
+  notSubmittedCount: number;
+  overdueCount: number;
+  nearestDeadline: {
+    taskId: number;
+    title: string;
+    dueDate: string;
+    daysLeft: number;
+  } | null;
+  recentGrades: {
+    taskId: number;
+    title: string;
+    grade: number;
+    gradedAt: string;
+  }[];
+};
+
 const initialStats: UserStats = {
   total: null,
   students: null,
@@ -28,6 +47,8 @@ const Dashboard: React.FC<DashboardProps> = ({ currentRole, onNavigate }) => {
   const [isUserStatsLoading, setIsUserStatsLoading] = useState(false);
   const [tasksCount, setTasksCount] = useState<number | null>(null);
   const [isTasksCountLoading, setIsTasksCountLoading] = useState(false);
+  const [studentDashboard, setStudentDashboard] = useState<StudentDashboard | null>(null);
+  const [isStudentDashboardLoading, setIsStudentDashboardLoading] = useState(false);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
@@ -106,6 +127,48 @@ const Dashboard: React.FC<DashboardProps> = ({ currentRole, onNavigate }) => {
   }, [apiUrl, currentRole]);
 
   useEffect(() => {
+    if (currentRole !== "student") {
+      setStudentDashboard(null);
+      setIsStudentDashboardLoading(false);
+      return;
+    }
+
+    const token = localStorage.getItem("token");
+    if (!token) {
+      return;
+    }
+
+    let aborted = false;
+    setIsStudentDashboardLoading(true);
+
+    const load = async () => {
+      try {
+        const response = await fetch(`${apiUrl}/tasks/student-dashboard`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (response.ok && !aborted) {
+          const data = await response.json();
+          setStudentDashboard(data);
+        }
+      } catch {
+        if (!aborted) {
+          setStudentDashboard(null);
+        }
+      } finally {
+        if (!aborted) {
+          setIsStudentDashboardLoading(false);
+        }
+      }
+    };
+
+    load();
+    return () => {
+      aborted = true;
+    };
+  }, [apiUrl, currentRole]);
+
+  useEffect(() => {
     if (currentRole !== "admin" && currentRole !== "teacher") {
       setTasksCount(null);
       setIsTasksCountLoading(false);
@@ -170,37 +233,158 @@ const Dashboard: React.FC<DashboardProps> = ({ currentRole, onNavigate }) => {
 
   const renderContent = () => {
     if (currentRole === "student") {
+      if (isStudentDashboardLoading) {
+        return <p style={{ color: "var(--text-muted)" }}>Загружаем...</p>;
+      }
+
+      const data = studentDashboard;
+      const progress = data && data.totalTasks > 0
+        ? Math.round((data.submittedCount / data.totalTasks) * 100)
+        : 0;
+
       return (
         <>
           <div className="dashboard-grid">
             <div className="card stat-card">
-              <h3>Активные задачи</h3>
+              <h3>Не сдано</h3>
               <div className="value" style={{ color: "var(--primary)" }}>
-                2
+                {data?.notSubmittedCount ?? "-"}
               </div>
+              <span style={{ fontSize: "0.9rem", color: "var(--text-muted)" }}>
+                из {data?.totalTasks ?? "-"} задач
+              </span>
             </div>
             <div className="card stat-card">
-              <h3>Средний балл</h3>
-              <div className="value">4.8</div>
+              <h3>Ближайший дедлайн</h3>
+              {data?.nearestDeadline ? (
+                <>
+                  <div
+                    className="value"
+                    style={{
+                      color: data.nearestDeadline.daysLeft <= 3
+                        ? "var(--danger)"
+                        : "var(--warning)",
+                      fontSize: "1.5rem",
+                    }}
+                  >
+                    {data.nearestDeadline.daysLeft} дн.
+                  </div>
+                  <span
+                    style={{
+                      fontSize: "0.85rem",
+                      color: "var(--text-muted)",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                    title={data.nearestDeadline.title}
+                  >
+                    {data.nearestDeadline.title}
+                  </span>
+                </>
+              ) : (
+                <div className="value" style={{ fontSize: "1.2rem" }}>—</div>
+              )}
             </div>
             <div className="card stat-card">
-              <h3>До срока сдачи</h3>
-              <div className="value" style={{ color: "var(--danger)" }}>
-                3 дня
+              <h3>Просрочено</h3>
+              <div
+                className="value"
+                style={{
+                  color: (data?.overdueCount ?? 0) > 0 ? "var(--danger)" : "var(--success)",
+                }}
+              >
+                {data?.overdueCount ?? 0}
               </div>
             </div>
           </div>
-          <div className="card">
-            <h3 style={{ marginBottom: "15px", color: "var(--text-main)" }}>
-              📅 Ближайшие события
-            </h3>
-            <p style={{ color: "var(--text-muted)" }}>
-              • 25 Ноября - Сдача главы ВКР
-            </p>
-            <p style={{ color: "var(--text-muted)" }}>
-              • 28 Ноября - Консультация с научруком
-            </p>
+
+          <div className="card" style={{ marginTop: 16 }}>
+            <h3 style={{ marginBottom: 12 }}>Прогресс</h3>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+              }}
+            >
+              <div
+                style={{
+                  flex: 1,
+                  height: 12,
+                  background: "#e5e7eb",
+                  borderRadius: 6,
+                  overflow: "hidden",
+                }}
+              >
+                <div
+                  style={{
+                    width: `${progress}%`,
+                    height: "100%",
+                    background: "var(--success)",
+                    transition: "width 0.3s",
+                  }}
+                />
+              </div>
+              <span style={{ fontWeight: 600, minWidth: 50 }}>
+                {data?.submittedCount ?? 0} / {data?.totalTasks ?? 0}
+              </span>
+            </div>
           </div>
+
+          {data?.recentGrades && data.recentGrades.length > 0 && (
+            <div className="card" style={{ marginTop: 16 }}>
+              <h3 style={{ marginBottom: 12 }}>Последние оценки</h3>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {data.recentGrades.map((item) => (
+                  <div
+                    key={item.taskId}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      padding: "8px 12px",
+                      background: "#f9fafb",
+                      borderRadius: 6,
+                    }}
+                  >
+                    <span
+                      style={{
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                        flex: 1,
+                      }}
+                    >
+                      {item.title}
+                    </span>
+                    <span
+                      style={{
+                        fontWeight: 600,
+                        padding: "2px 10px",
+                        borderRadius: 4,
+                        marginLeft: 12,
+                        background:
+                          item.grade >= 75
+                            ? "#dcfce7"
+                            : item.grade >= 50
+                            ? "#fef9c3"
+                            : "#fee2e2",
+                        color:
+                          item.grade >= 75
+                            ? "#166534"
+                            : item.grade >= 50
+                            ? "#854d0e"
+                            : "#dc2626",
+                      }}
+                    >
+                      {item.grade}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </>
       );
     } else if (currentRole === "teacher") {
