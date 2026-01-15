@@ -9,6 +9,7 @@ import PlanView from "../components/PlanView";
 import { useProfile } from "../components/ProfileProvider";
 import SettingsPanel from "../components/SettingsPanel";
 import Sidebar from "../components/Sidebar";
+import TaskCalendar from "../components/TaskCalendar";
 import TaskList from "../components/TaskList";
 import UserList from "../components/UserList";
 
@@ -27,6 +28,7 @@ function HomeContent() {
       "journal",
       "settings",
       "plan",
+      "calendar",
     ];
     return requestedView && allowed.includes(requestedView)
       ? requestedView
@@ -135,6 +137,8 @@ function HomeContent() {
         return <SettingsPanel />;
       case "plan":
         return <PlanView currentRole={currentRole} currentUserId={user?.id} />;
+      case "calendar":
+        return <TaskCalendar />;
       default:
         return (
           <div className="card">
