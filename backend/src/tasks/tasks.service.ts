@@ -67,6 +67,18 @@ export type CalendarTaskResponse = {
   group: { id: number; name: string } | null;
 };
 
+export type StudentSubmissionStatus = {
+  id: number;
+  fullName: string;
+  submittedAt?: Date;
+  grade?: number | null;
+};
+
+export type TaskStudentsStatusResponse = {
+  submitted: StudentSubmissionStatus[];
+  notSubmitted: StudentSubmissionStatus[];
+};
+
 type TaskWithRelations = {
   id: number;
   title: string;
@@ -966,5 +978,77 @@ export class TasksService {
         status: task.status,
         group: task.group ? { id: task.group.id, name: task.group.name } : null,
       }));
+  }
+
+  async getStudentsStatusForTask(
+    taskId: number,
+    userId: number,
+    roles: string[],
+  ): Promise<TaskStudentsStatusResponse> {
+    const normalizedRoles = roles.map((r) => r.toUpperCase()) as RoleName[];
+    const isTeacherOrAdmin = normalizedRoles.some(
+      (r) => r === RoleName.TEACHER || r === RoleName.ADMIN,
+    );
+
+    if (!isTeacherOrAdmin) {
+      throw new ForbiddenException('Недостаточно прав.');
+    }
+
+    const task = await this.prisma.task.findUnique({
+      where: { id: taskId },
+      select: { id: true, groupId: true },
+    });
+
+    if (!task) {
+      throw new NotFoundException('Задача не найдена.');
+    }
+
+    if (!task.groupId) {
+      return { submitted: [], notSubmitted: [] };
+    }
+
+    const students = await this.prisma.user.findMany({
+      where: {
+        groupId: task.groupId,
+        roles: { some: { name: RoleName.STUDENT } },
+      },
+      select: { id: true, fullName: true },
+      orderBy: { fullName: 'asc' },
+    });
+
+    const submissions = await this.prisma.submission.findMany({
+      where: { taskId },
+      select: {
+        studentId: true,
+        submittedAt: true,
+        grade: true,
+      },
+    });
+
+    const submissionMap = new Map(
+      submissions.map((s) => [s.studentId, s]),
+    );
+
+    const submitted: StudentSubmissionStatus[] = [];
+    const notSubmitted: StudentSubmissionStatus[] = [];
+
+    for (const student of students) {
+      const submission = submissionMap.get(student.id);
+      if (submission) {
+        submitted.push({
+          id: student.id,
+          fullName: student.fullName,
+          submittedAt: submission.submittedAt,
+          grade: submission.grade,
+        });
+      } else {
+        notSubmitted.push({
+          id: student.id,
+          fullName: student.fullName,
+        });
+      }
+    }
+
+    return { submitted, notSubmitted };
   }
 }

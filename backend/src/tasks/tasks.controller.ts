@@ -29,6 +29,7 @@ import {
   CalendarTaskResponse,
   TaskResponse,
   TasksService,
+  TaskStudentsStatusResponse,
   TeacherGroupStudentsResponse,
 } from './tasks.service';
 // Интерфейс для аутентифицированного запроса
@@ -108,6 +109,19 @@ export class TasksController {
       return this.tasksService.getTasksForCalendar(userId, roles, currentMonth);
     }
     return this.tasksService.getTasksForCalendar(userId, roles, month);
+  }
+
+  @Get(':id/students-status')
+  getStudentsStatus(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<TaskStudentsStatusResponse> {
+    const userId = req.user?.sub;
+    const roles = req.user?.roles ?? [];
+    if (!userId) {
+      throw new UnauthorizedException();
+    }
+    return this.tasksService.getStudentsStatusForTask(id, userId, roles);
   }
 
   @Get()
