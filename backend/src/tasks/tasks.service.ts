@@ -98,6 +98,18 @@ export type StudentDashboardResponse = {
   }[];
 };
 
+export type TeacherDashboardResponse = {
+  myTasksCount: number;
+  pendingReviewCount: number;
+  overdueStudentsCount: number;
+  recentSubmissions: {
+    studentName: string;
+    taskTitle: string;
+    taskId: number;
+    submittedAt: Date;
+  }[];
+};
+
 type TaskWithRelations = {
   id: number;
   title: string;
@@ -1161,6 +1173,71 @@ export class TasksService {
       overdueCount,
       nearestDeadline,
       recentGrades,
+    };
+  }
+
+  async getTeacherDashboard(userId: number): Promise<TeacherDashboardResponse> {
+    const myTasks = await this.prisma.task.findMany({
+      where: { createdById: userId },
+      select: {
+        id: true,
+        title: true,
+        dueDate: true,
+        groupId: true,
+      },
+    });
+
+    const myTasksCount = myTasks.length;
+    const myTaskIds = myTasks.map((t) => t.id);
+
+    const submissions = await this.prisma.submission.findMany({
+      where: { taskId: { in: myTaskIds } },
+      select: {
+        id: true,
+        taskId: true,
+        studentId: true,
+        submittedAt: true,
+        grade: true,
+        student: { select: { fullName: true } },
+        task: { select: { title: true } },
+      },
+      orderBy: { submittedAt: 'desc' },
+    });
+
+    const pendingReviewCount = submissions.filter((s) => s.grade === null).length;
+
+    const recentSubmissions = submissions.slice(0, 5).map((s) => ({
+      studentName: s.student.fullName,
+      taskTitle: s.task.title,
+      taskId: s.taskId,
+      submittedAt: s.submittedAt,
+    }));
+
+    const now = new Date();
+    let overdueStudentsCount = 0;
+
+    for (const task of myTasks) {
+      if (task.dueDate && task.dueDate < now && task.groupId) {
+        const studentsInGroup = await this.prisma.user.count({
+          where: {
+            groupId: task.groupId,
+            roles: { some: { name: RoleName.STUDENT } },
+          },
+        });
+
+        const submissionsForTask = submissions.filter((s) => s.taskId === task.id);
+        const notSubmittedCount = studentsInGroup - submissionsForTask.length;
+        if (notSubmittedCount > 0) {
+          overdueStudentsCount += notSubmittedCount;
+        }
+      }
+    }
+
+    return {
+      myTasksCount,
+      pendingReviewCount,
+      overdueStudentsCount,
+      recentSubmissions,
     };
   }
 }

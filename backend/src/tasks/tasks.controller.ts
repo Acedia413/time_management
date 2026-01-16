@@ -31,6 +31,7 @@ import {
   TaskResponse,
   TasksService,
   TaskStudentsStatusResponse,
+  TeacherDashboardResponse,
   TeacherGroupStudentsResponse,
 } from './tasks.service';
 // Интерфейс для аутентифицированного запроса
@@ -103,6 +104,17 @@ export class TasksController {
       throw new UnauthorizedException();
     }
     return this.tasksService.getStudentDashboard(userId);
+  }
+
+  @Get('teacher-dashboard')
+  getTeacherDashboard(
+    @Req() req: AuthenticatedRequest,
+  ): Promise<TeacherDashboardResponse> {
+    const userId = req.user?.sub;
+    if (!userId) {
+      throw new UnauthorizedException();
+    }
+    return this.tasksService.getTeacherDashboard(userId);
   }
 
   @Get('calendar')
