@@ -48,6 +48,22 @@ type TeacherDashboard = {
   }[];
 };
 
+type AdminDashboard = {
+  recentUsers: {
+    id: number;
+    fullName: string;
+    username: string;
+    roles: string[];
+  }[];
+  groupStats: {
+    groupId: number;
+    groupName: string;
+    studentsCount: number;
+    tasksCount: number;
+  }[];
+  totalOverdueCount: number;
+};
+
 const initialStats: UserStats = {
   total: null,
   students: null,
@@ -63,6 +79,8 @@ const Dashboard: React.FC<DashboardProps> = ({ currentRole, onNavigate }) => {
   const [isStudentDashboardLoading, setIsStudentDashboardLoading] = useState(false);
   const [teacherDashboard, setTeacherDashboard] = useState<TeacherDashboard | null>(null);
   const [isTeacherDashboardLoading, setIsTeacherDashboardLoading] = useState(false);
+  const [adminDashboard, setAdminDashboard] = useState<AdminDashboard | null>(null);
+  const [isAdminDashboardLoading, setIsAdminDashboardLoading] = useState(false);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
@@ -254,6 +272,48 @@ const Dashboard: React.FC<DashboardProps> = ({ currentRole, onNavigate }) => {
     };
 
     loadTasks();
+    return () => {
+      aborted = true;
+    };
+  }, [apiUrl, currentRole]);
+
+  useEffect(() => {
+    if (currentRole !== "admin") {
+      setAdminDashboard(null);
+      setIsAdminDashboardLoading(false);
+      return;
+    }
+
+    const token = localStorage.getItem("token");
+    if (!token) {
+      return;
+    }
+
+    let aborted = false;
+    setIsAdminDashboardLoading(true);
+
+    const load = async () => {
+      try {
+        const response = await fetch(`${apiUrl}/tasks/admin-dashboard`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (response.ok && !aborted) {
+          const data = await response.json();
+          setAdminDashboard(data);
+        }
+      } catch {
+        if (!aborted) {
+          setAdminDashboard(null);
+        }
+      } finally {
+        if (!aborted) {
+          setIsAdminDashboardLoading(false);
+        }
+      }
+    };
+
+    load();
     return () => {
       aborted = true;
     };
@@ -498,68 +558,147 @@ const Dashboard: React.FC<DashboardProps> = ({ currentRole, onNavigate }) => {
         </>
       );
     } else {
+      const adminData = adminDashboard;
+      const isLoading = isUserStatsLoading || isTasksCountLoading || isAdminDashboardLoading;
+
+      if (isLoading && !adminData) {
+        return <p style={{ color: "var(--text-muted)" }}>Загружаем...</p>;
+      }
+
       return (
-        <div className="dashboard-grid">
-          <div
-            className="card stat-card"
-            role={onNavigate ? "button" : undefined}
-            tabIndex={onNavigate ? 0 : undefined}
-            onClick={handleUsersNavigate}
-            onKeyDown={(event) => {
-              if (!onNavigate) {
-                return;
-              }
-              if (event.key === "Enter" || event.key === " ") {
-                event.preventDefault();
-                handleUsersNavigate();
-              }
-            }}
-            style={{
-              cursor: onNavigate ? "pointer" : "default",
-              display: "flex",
-              flexDirection: "column",
-              gap: 4,
-            }}
-          >
-            <h3>Всего пользователей</h3>
-            <div className="value">
-              {isUserStatsLoading ? "..." : userStats.total ?? "-"}
-            </div>
+        <>
+          <div className="dashboard-grid">
             <div
+              className="card stat-card"
+              role={onNavigate ? "button" : undefined}
+              tabIndex={onNavigate ? 0 : undefined}
+              onClick={handleUsersNavigate}
+              onKeyDown={(event) => {
+                if (!onNavigate) {
+                  return;
+                }
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  handleUsersNavigate();
+                }
+              }}
               style={{
+                cursor: onNavigate ? "pointer" : "default",
                 display: "flex",
                 flexDirection: "column",
-                color: "var(--text-muted)",
-                fontSize: "0.95rem",
-                lineHeight: 1.4,
+                gap: 4,
               }}
             >
-              <span>
-                Студенты:{" "}
-                {isUserStatsLoading ? "..." : userStats.students ?? "-"}
-              </span>
-              <span>
-                Преподаватели:{" "}
-                {isUserStatsLoading ? "..." : userStats.teachers ?? "-"}
-              </span>
+              <h3>Всего пользователей</h3>
+              <div className="value">
+                {isUserStatsLoading ? "..." : userStats.total ?? "-"}
+              </div>
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  color: "var(--text-muted)",
+                  fontSize: "0.95rem",
+                  lineHeight: 1.4,
+                }}
+              >
+                <span>
+                  Студенты:{" "}
+                  {isUserStatsLoading ? "..." : userStats.students ?? "-"}
+                </span>
+                <span>
+                  Преподаватели:{" "}
+                  {isUserStatsLoading ? "..." : userStats.teachers ?? "-"}
+                </span>
+              </div>
+            </div>
+            <div className="card stat-card">
+              <h3>Задач в системе</h3>
+              <div className="value">
+                {isTasksCountLoading ? "..." : tasksCount ?? "-"}
+              </div>
+            </div>
+            <div className="card stat-card">
+              <h3>Просрочено по системе</h3>
+              <div
+                className="value"
+                style={{
+                  color: (adminData?.totalOverdueCount ?? 0) > 0 ? "var(--danger)" : "var(--success)",
+                }}
+              >
+                {adminData?.totalOverdueCount ?? 0}
+              </div>
             </div>
           </div>
-          <div className="card stat-card">
-            <h3>Задач в системе</h3>
-            <div className="value">
-              {isTasksCountLoading ? "..." : tasksCount ?? "-"}
+
+          {adminData?.recentUsers && adminData.recentUsers.length > 0 && (
+            <div className="card" style={{ marginTop: 16 }}>
+              <h3 style={{ marginBottom: 12 }}>Новые пользователи</h3>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {adminData.recentUsers.map((user) => (
+                  <div
+                    key={user.id}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      padding: "8px 12px",
+                      background: "#f9fafb",
+                      borderRadius: 6,
+                    }}
+                  >
+                    <span style={{ flex: 1 }}>
+                      <strong>{user.fullName}</strong>
+                      <span style={{ color: "var(--text-muted)", marginLeft: 8 }}>
+                        (@{user.username})
+                      </span>
+                    </span>
+                    <span
+                      style={{
+                        fontSize: "0.85rem",
+                        color: "var(--text-muted)",
+                        marginLeft: 12,
+                      }}
+                    >
+                      {user.roles.join(", ")}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
-          <div className="card stat-card">
-            <h3>Статус системы</h3>
-            <div
-              className="value"
-              style={{ color: "var(--success)", fontSize: "1.5rem" }}
-            >
-              Работает штатно
+          )}
+
+          {adminData?.groupStats && adminData.groupStats.length > 0 && (
+            <div className="card" style={{ marginTop: 16 }}>
+              <h3 style={{ marginBottom: 12 }}>Статистика по группам</h3>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {adminData.groupStats.map((group) => (
+                  <div
+                    key={group.groupId}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      padding: "8px 12px",
+                      background: "#f9fafb",
+                      borderRadius: 6,
+                    }}
+                  >
+                    <span style={{ fontWeight: 500 }}>{group.groupName}</span>
+                    <div style={{ display: "flex", gap: 16 }}>
+                      <span style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>
+                        Студентов: <strong>{group.studentsCount}</strong>
+                      </span>
+                      <span style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>
+                        Задач: <strong>{group.tasksCount}</strong>
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
-        </div>
+          )}
+        </>
       );
     }
   };
