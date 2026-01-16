@@ -36,6 +36,18 @@ type StudentDashboard = {
   }[];
 };
 
+type TeacherDashboard = {
+  myTasksCount: number;
+  pendingReviewCount: number;
+  overdueStudentsCount: number;
+  recentSubmissions: {
+    studentName: string;
+    taskTitle: string;
+    taskId: number;
+    submittedAt: string;
+  }[];
+};
+
 const initialStats: UserStats = {
   total: null,
   students: null,
@@ -49,6 +61,8 @@ const Dashboard: React.FC<DashboardProps> = ({ currentRole, onNavigate }) => {
   const [isTasksCountLoading, setIsTasksCountLoading] = useState(false);
   const [studentDashboard, setStudentDashboard] = useState<StudentDashboard | null>(null);
   const [isStudentDashboardLoading, setIsStudentDashboardLoading] = useState(false);
+  const [teacherDashboard, setTeacherDashboard] = useState<TeacherDashboard | null>(null);
+  const [isTeacherDashboardLoading, setIsTeacherDashboardLoading] = useState(false);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
@@ -169,7 +183,49 @@ const Dashboard: React.FC<DashboardProps> = ({ currentRole, onNavigate }) => {
   }, [apiUrl, currentRole]);
 
   useEffect(() => {
-    if (currentRole !== "admin" && currentRole !== "teacher") {
+    if (currentRole !== "teacher") {
+      setTeacherDashboard(null);
+      setIsTeacherDashboardLoading(false);
+      return;
+    }
+
+    const token = localStorage.getItem("token");
+    if (!token) {
+      return;
+    }
+
+    let aborted = false;
+    setIsTeacherDashboardLoading(true);
+
+    const load = async () => {
+      try {
+        const response = await fetch(`${apiUrl}/tasks/teacher-dashboard`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (response.ok && !aborted) {
+          const data = await response.json();
+          setTeacherDashboard(data);
+        }
+      } catch {
+        if (!aborted) {
+          setTeacherDashboard(null);
+        }
+      } finally {
+        if (!aborted) {
+          setIsTeacherDashboardLoading(false);
+        }
+      }
+    };
+
+    load();
+    return () => {
+      aborted = true;
+    };
+  }, [apiUrl, currentRole]);
+
+  useEffect(() => {
+    if (currentRole !== "admin") {
       setTasksCount(null);
       setIsTasksCountLoading(false);
       return;
@@ -181,47 +237,23 @@ const Dashboard: React.FC<DashboardProps> = ({ currentRole, onNavigate }) => {
     }
 
     let aborted = false;
+    setIsTasksCountLoading(true);
 
-    // Если Админ — грузим задачи
-    if (currentRole === "admin") {
-      setIsTasksCountLoading(true);
-      const loadTasks = async () => {
-        try {
-          const response = await fetch(`${apiUrl}/tasks`, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          if (response.ok && !aborted) {
-            const data = await response.json();
-            if (Array.isArray(data)) setTasksCount(data.length);
-          }
-        } finally {
-          if (!aborted) setIsTasksCountLoading(false);
+    const loadTasks = async () => {
+      try {
+        const response = await fetch(`${apiUrl}/tasks`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (response.ok && !aborted) {
+          const data = await response.json();
+          if (Array.isArray(data)) setTasksCount(data.length);
         }
-      };
-      loadTasks();
-    }
+      } finally {
+        if (!aborted) setIsTasksCountLoading(false);
+      }
+    };
 
-    // Если Учитель — грузим активных студентов
-    if (currentRole === "teacher") {
-      const loadTeacherStats = async () => {
-        try {
-          const response = await fetch(`${apiUrl}/users/teacher-stats`, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          if (response.ok && !aborted) {
-            const data = await response.json();
-            setUserStats((prev) => ({
-              ...prev,
-              students: data.activeStudents,
-            }));
-          }
-        } catch (e) {
-          console.error(e);
-        }
-      };
-      loadTeacherStats();
-    }
-
+    loadTasks();
     return () => {
       aborted = true;
     };
@@ -388,32 +420,81 @@ const Dashboard: React.FC<DashboardProps> = ({ currentRole, onNavigate }) => {
         </>
       );
     } else if (currentRole === "teacher") {
+      if (isTeacherDashboardLoading) {
+        return <p style={{ color: "var(--text-muted)" }}>Загружаем...</p>;
+      }
+
+      const data = teacherDashboard;
+
       return (
         <>
           <div className="dashboard-grid">
             <div className="card stat-card">
+              <h3>Мои задачи</h3>
+              <div className="value" style={{ color: "var(--primary)" }}>
+                {data?.myTasksCount ?? "-"}
+              </div>
+            </div>
+            <div className="card stat-card">
               <h3>На проверке</h3>
               <div className="value" style={{ color: "var(--warning)" }}>
-                5
+                {data?.pendingReviewCount ?? "-"}
               </div>
             </div>
             <div className="card stat-card">
-              <h3>Активные студенты</h3>
-              <div className="value">{userStats.students ?? "-"}</div>
-            </div>
-            <div className="card stat-card">
-              <h3>Просрочено</h3>
-              <div className="value" style={{ color: "var(--danger)" }}>
-                2
+              <h3>Просрочено студентами</h3>
+              <div
+                className="value"
+                style={{
+                  color: (data?.overdueStudentsCount ?? 0) > 0 ? "var(--danger)" : "var(--success)",
+                }}
+              >
+                {data?.overdueStudentsCount ?? 0}
               </div>
             </div>
           </div>
-          <div className="card">
-            <h3 style={{ marginBottom: "15px", color: "var(--text-main)" }}>
-              💬 Последние комментарии
-            </h3>
-            <p>Иванов И. загрузил &quot;Отчет по практике&quot;</p>
-          </div>
+
+          {data?.recentSubmissions && data.recentSubmissions.length > 0 && (
+            <div className="card" style={{ marginTop: 16 }}>
+              <h3 style={{ marginBottom: 12 }}>Последние сдачи</h3>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {data.recentSubmissions.map((item, index) => (
+                  <div
+                    key={`${item.taskId}-${index}`}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      padding: "8px 12px",
+                      background: "#f9fafb",
+                      borderRadius: 6,
+                    }}
+                  >
+                    <span
+                      style={{
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                        flex: 1,
+                      }}
+                    >
+                      <strong>{item.studentName}</strong> сдал &quot;{item.taskTitle}&quot;
+                    </span>
+                    <span
+                      style={{
+                        fontSize: "0.85rem",
+                        color: "var(--text-muted)",
+                        marginLeft: 12,
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {new Date(item.submittedAt).toLocaleDateString("ru-RU")}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </>
       );
     } else {
