@@ -110,6 +110,22 @@ export type TeacherDashboardResponse = {
   }[];
 };
 
+export type AdminDashboardResponse = {
+  recentUsers: {
+    id: number;
+    fullName: string;
+    username: string;
+    roles: string[];
+  }[];
+  groupStats: {
+    groupId: number;
+    groupName: string;
+    studentsCount: number;
+    tasksCount: number;
+  }[];
+  totalOverdueCount: number;
+};
+
 type TaskWithRelations = {
   id: number;
   title: string;
@@ -1238,6 +1254,84 @@ export class TasksService {
       pendingReviewCount,
       overdueStudentsCount,
       recentSubmissions,
+    };
+  }
+
+  async getAdminDashboard(): Promise<AdminDashboardResponse> {
+    const recentUsers = await this.prisma.user.findMany({
+      orderBy: { id: 'desc' },
+      take: 5,
+      select: {
+        id: true,
+        fullName: true,
+        username: true,
+        roles: { select: { name: true } },
+      },
+    });
+
+    const groups = await this.prisma.group.findMany({
+      select: {
+        id: true,
+        name: true,
+        _count: {
+          select: {
+            students: true,
+            tasks: true,
+          },
+        },
+      },
+    });
+
+    const groupStats = groups.map((g) => ({
+      groupId: g.id,
+      groupName: g.name,
+      studentsCount: g._count.students,
+      tasksCount: g._count.tasks,
+    }));
+
+    const now = new Date();
+    const tasksWithDueDate = await this.prisma.task.findMany({
+      where: {
+        dueDate: { lt: now },
+        groupId: { not: null },
+      },
+      select: {
+        id: true,
+        groupId: true,
+      },
+    });
+
+    let totalOverdueCount = 0;
+
+    for (const task of tasksWithDueDate) {
+      if (!task.groupId) continue;
+
+      const studentsInGroup = await this.prisma.user.count({
+        where: {
+          groupId: task.groupId,
+          roles: { some: { name: RoleName.STUDENT } },
+        },
+      });
+
+      const submissionsCount = await this.prisma.submission.count({
+        where: { taskId: task.id },
+      });
+
+      const notSubmitted = studentsInGroup - submissionsCount;
+      if (notSubmitted > 0) {
+        totalOverdueCount += notSubmitted;
+      }
+    }
+
+    return {
+      recentUsers: recentUsers.map((u) => ({
+        id: u.id,
+        fullName: u.fullName,
+        username: u.username,
+        roles: u.roles.map((r) => r.name),
+      })),
+      groupStats,
+      totalOverdueCount,
     };
   }
 }

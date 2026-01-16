@@ -26,6 +26,7 @@ import { UpdateTaskPriorityDto } from './dto/update-task-priority.dto';
 import { UpdateTaskStatusDto } from './dto/update-task-status.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import {
+  AdminDashboardResponse,
   CalendarTaskResponse,
   StudentDashboardResponse,
   TaskResponse,
@@ -115,6 +116,17 @@ export class TasksController {
       throw new UnauthorizedException();
     }
     return this.tasksService.getTeacherDashboard(userId);
+  }
+
+  @Get('admin-dashboard')
+  getAdminDashboard(
+    @Req() req: AuthenticatedRequest,
+  ): Promise<AdminDashboardResponse> {
+    const roles = req.user?.roles ?? [];
+    if (!roles.includes('ADMIN')) {
+      throw new UnauthorizedException();
+    }
+    return this.tasksService.getAdminDashboard();
   }
 
   @Get('calendar')
