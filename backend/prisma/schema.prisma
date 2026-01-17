@@ -138,12 +138,13 @@ model Submission {
 }
 
 model TaskPriority {
-  id       Int  @id @default(autoincrement())
-  userId   Int
-  taskId   Int
-  priority Int  @default(0)
-  user     User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  task     Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  id               Int  @id @default(autoincrement())
+  userId           Int
+  taskId           Int
+  priority         Int  @default(0)
+  estimatedMinutes Int?
+  user             User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  task             Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
   @@unique([userId, taskId])
 }

@@ -22,6 +22,7 @@ import { CreateSubmissionDto } from './dto/create-submission.dto';
 import { CreateTaskCommentDto } from './dto/create-task-comment.dto';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { GradeSubmissionDto } from './dto/grade-submission.dto';
+import { UpdateTaskEstimateDto } from './dto/update-task-estimate.dto';
 import { UpdateTaskPriorityDto } from './dto/update-task-priority.dto';
 import { UpdateTaskStatusDto } from './dto/update-task-status.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
@@ -94,6 +95,20 @@ export class TasksController {
       throw new UnauthorizedException();
     }
     return this.tasksService.updateTaskPriority(userId, id, dto.priority);
+  }
+
+  // Обновляет оценку времени задачи
+  @Patch(':id/estimate')
+  updateTaskEstimate(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateTaskEstimateDto,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    const userId = req.user?.sub;
+    if (!userId) {
+      throw new UnauthorizedException();
+    }
+    return this.tasksService.updateTaskEstimate(userId, id, dto.estimatedMinutes ?? null);
   }
 
   @Get('student-dashboard')

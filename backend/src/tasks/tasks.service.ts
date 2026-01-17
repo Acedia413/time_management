@@ -794,10 +794,10 @@ export class TasksService {
   // Получение приоритетов задач
   async getTaskPriorities(
     userId: number,
-  ): Promise<{ taskId: number; priority: number }[]> {
+  ): Promise<{ taskId: number; priority: number; estimatedMinutes: number | null }[]> {
     const priorities = await this.prisma.taskPriority.findMany({
       where: { userId },
-      select: { taskId: true, priority: true },
+      select: { taskId: true, priority: true, estimatedMinutes: true },
       orderBy: { priority: 'asc' },
     });
     return priorities;
@@ -808,7 +808,7 @@ export class TasksService {
     userId: number,
     taskId: number,
     priority: number,
-  ): Promise<{ taskId: number; priority: number }> {
+  ): Promise<{ taskId: number; priority: number; estimatedMinutes: number | null }> {
     const task = await this.prisma.task.findUnique({
       where: { id: taskId },
     });
@@ -820,7 +820,29 @@ export class TasksService {
       where: { userId_taskId: { userId, taskId } },
       update: { priority },
       create: { userId, taskId, priority },
-      select: { taskId: true, priority: true },
+      select: { taskId: true, priority: true, estimatedMinutes: true },
+    });
+    return saved;
+  }
+
+  // Обновление оценки времени задачи
+  async updateTaskEstimate(
+    userId: number,
+    taskId: number,
+    estimatedMinutes: number | null,
+  ): Promise<{ taskId: number; priority: number; estimatedMinutes: number | null }> {
+    const task = await this.prisma.task.findUnique({
+      where: { id: taskId },
+    });
+    if (!task) {
+      throw new NotFoundException('Задача не найдена.');
+    }
+
+    const saved = await this.prisma.taskPriority.upsert({
+      where: { userId_taskId: { userId, taskId } },
+      update: { estimatedMinutes },
+      create: { userId, taskId, priority: 0, estimatedMinutes },
+      select: { taskId: true, priority: true, estimatedMinutes: true },
     });
     return saved;
   }
